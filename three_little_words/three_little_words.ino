@@ -2,6 +2,8 @@
 #include <U8g2lib.h>
 #include <math.h>
 
+#include <vector>
+
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 
@@ -20,20 +22,8 @@
 #include <Wire.h>
 #endif
 
-typedef enum 
-{ 
-  SEQ
-} AppPage;
-
-class App {
-public:
-  App() {}
-  void UpdateDisplay() {}
-};
-
 struct repeating_timer timer;
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 5, /* data=*/ 4);   // ESP32 Thing, HW I2C with pin remapping
-AnalogOut* analogOut;
 
 typedef enum 
 { 
@@ -41,6 +31,17 @@ typedef enum
   PARAM_SELECT,
   PARAM_MODIFY
 } InputMode;
+
+class App {
+public:
+  App() {}
+  virtual void NextParam() {}
+  virtual void PrevParam() {}
+  virtual void DecParam() {}
+  virtual void IncParam() {}
+  virtual void UpdateDisplay() {}
+  virtual void Process() {}
+};
 
 class Seq : public App {
 public:
@@ -55,15 +56,19 @@ public:
   int appHeight;
   int width;
   int height;
+  AnalogOut* analogOut;
   Seq(int x, int y, int width, int height, int len) {
     this->len = len;
     this->selectedParam = 0;
+    this->playingParam = 0;
     this->values = (float*)malloc(sizeof(float)*this->len);
     this->xOffset = x; this->yOffset = y; this->appWidth = width; this->appHeight = height;
     for(int i=0;i<this->len;i++) values[i]=0.5;
+    this->analogOut = new AnalogOut(2);
   }
   ~Seq() {
     free(this->values);
+    delete analogOut;
   }
   void NextParam() {this->selectedParam = (this->selectedParam+1)%this->len;}
   void PrevParam() {this->selectedParam = (this->selectedParam-1); if(this->selectedParam<0) this->selectedParam += this->len;}
@@ -87,7 +92,7 @@ public:
     phase+=10.0/SAMPLE_RATE;
     if(phase>1.0) {
       phase=fmod(phase,1.0);
-      analogOut->SetOutputVoltage(0, values[playingParam]);
+      analogOut->SetOutputVoltage(0, values[this->playingParam]);
       analogOut->SetOffsetVoltage(1, OUTPUT_VMAX);
       playingParam=(playingParam+1)%len;
     }
@@ -141,29 +146,49 @@ public:
     while(!adc_fifo_is_empty()) {
       lastVal = ((adc_fifo_get()*1.0)/(1<<12)) - 0.5;
     }
-    analogOut->SetOutputVoltage(0, ((lastVal*abs(phase*2.0-1.0))+0.5)*OUTPUT_VMAX*2);
-    analogOut->SetOffsetVoltage(1, 0);
+    //analogOut->SetOutputVoltage(0, ((lastVal*abs(phase*2.0-1.0))+0.5)*OUTPUT_VMAX*2);
+    //analogOut->SetOffsetVoltage(1, 0);
     phase+=5.0/SAMPLE_RATE;
     if(phase>1.0) phase=fmod(phase,1.0);
   }
 };
 
-Seq mainApp(0,0,128,64,16);
+class Info : public App {
+public:
+  Info(int x, int y, int width, int height, int len) {}
+  void UpdateDisplay() {
+    char buffer[32];
+    sprintf(buffer, "TIMER: %d", TIMER_INTERVAL);
+    u8g2.drawStr(0, 0, buffer);
+    sprintf(buffer, "SR: %f", SAMPLE_RATE);
+    u8g2.drawStr(0, 10, buffer);
+    sprintf(buffer, "OFF_VMAX: %f", OFFSET_VMAX);
+    u8g2.drawStr(0, 20, buffer);
+    sprintf(buffer, "OUT_VMAX: %f", OUTPUT_VMAX);
+    u8g2.drawStr(0, 30, buffer);
+  }
+};
+
 InputMode mode = PARAM_MODIFY;
+App* apps[3];
+uint8_t currentApp = 0;
 
 Button btn_a(7);
 Button btn_b(8);
 Button btn_c(9);
 
 bool repeating_timer_callback(struct repeating_timer *t) {
-  mainApp.Process();
+  App* app = apps[currentApp];
+  app->Process();
   return true;
 }
 
 void setup() {
   u8g2.setBusClock(400000);
   u8g2.begin();
-  analogOut = new AnalogOut(2, 1024);
+  apps[0] = new Info(0,0,128,64,16);
+  apps[1] = new Seq(0,0,128,64,16);
+  //apps[2] = new AudioFxTest(0,0,128,64,16);
   add_repeating_timer_us(-TIMER_INTERVAL, repeating_timer_callback, NULL, &timer);
 }
 
@@ -179,6 +204,7 @@ void drawPoly(int sides, float angle) {
   }
 }
 
+float global_time=0;
 void loop() {
   u8g2.setFont(u8g2_font_6x10_tf);
   u8g2.setFontRefHeightExtendedText();
@@ -202,23 +228,26 @@ void loop() {
       default:
         mode=PARAM_SELECT;
     }
+  } else if(btn_c.Held()) {
+      if(btn_a.Pressed()) currentApp=max(0, currentApp-1);
+      if(btn_b.Pressed()) currentApp=(currentApp+1)%2;
   }
 
   switch(mode) {
-    case PAGE_SELECT:
-    break;
     case PARAM_SELECT:
-      if(btn_a.Pressed()) mainApp.PrevParam();
-      if(btn_b.Pressed()) mainApp.NextParam();
+      if(btn_a.Pressed()) apps[currentApp]->PrevParam();
+      if(btn_b.Pressed()) apps[currentApp]->NextParam();
     break;
     case PARAM_MODIFY:
-      if(btn_a.Held()) mainApp.DecParam();
-      if(btn_b.Held()) mainApp.IncParam();
+      if(btn_a.Held()) apps[currentApp]->DecParam();
+      if(btn_b.Held()) apps[currentApp]->IncParam();
     break;
   }
 
-  mainApp.UpdateDisplay();
-  
+  apps[currentApp]->UpdateDisplay();
+
+  drawPoly(3,global_time);
+  global_time+=1.0/5.0;
+
   u8g2.sendBuffer();
-  //delay(1000/30);
 }
