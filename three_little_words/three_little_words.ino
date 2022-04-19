@@ -74,9 +74,7 @@ public:
     values[this->selectedParam] += 0.05;
   }
   void UpdateDisplay() {
-    char buffer[32];
     float colWidth = 128.0/len;
-    u8g2.drawStr(0, 24, buffer);
     for(int i=0;i<len;i++) {
       float height = 56*values[i];
       float padding = 1.0;
