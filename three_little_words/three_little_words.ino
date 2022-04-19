@@ -74,17 +74,19 @@ public:
     values[this->selectedParam] += 0.05;
   }
   void UpdateDisplay() {
+    char buffer[32];
     float colWidth = 128.0/len;
+    u8g2.drawStr(0, 24, buffer);
     for(int i=0;i<len;i++) {
       float height = 56*values[i];
       float padding = 1.0;
       u8g2.drawRBox(i*colWidth, 56-height, max(1,colWidth-1), height, 2);
     }
-    u8g2.drawRFrame(this->selectedParam*colWidth, 57, colWidth, 3, 1);
+    u8g2.drawRBox(this->selectedParam*colWidth, 57, colWidth, 3, 1);
     u8g2.drawRBox(this->playingParam*colWidth, 61, colWidth, 3, 1);
   }
   void Process() {
-    phase+=10.0/SAMPLERATE;
+    phase+=10.0/SAMPLE_RATE;
     if(phase>1.0) {
       phase=fmod(phase,1.0);
       analogOut->SetOutputVoltage(0, values[playingParam]);
@@ -122,7 +124,7 @@ public:
         false,   // We won't see the ERR bit because of 8 bit reads; disable.
         false     // Shift each sample to 8 bits when pushing to FIFO
     );
-    adc_set_clkdiv(CPU_SPEED/SAMPLERATE);
+    adc_set_clkdiv(CPU_SPEED/SAMPLE_RATE);
     adc_run(true);
   }
   ~AudioFxTest() {
@@ -143,7 +145,7 @@ public:
     }
     analogOut->SetOutputVoltage(0, ((lastVal*abs(phase*2.0-1.0))+0.5)*OUTPUT_VMAX*2);
     analogOut->SetOffsetVoltage(1, 0);
-    phase+=5.0/SAMPLERATE;
+    phase+=5.0/SAMPLE_RATE;
     if(phase>1.0) phase=fmod(phase,1.0);
   }
 };
@@ -220,5 +222,5 @@ void loop() {
   mainApp.UpdateDisplay();
   
   u8g2.sendBuffer();
-  delay(100);
+  //delay(1000/30);
 }
