@@ -1,0 +1,6 @@
+{
+    "configuration": "flash=2097152_0,freq=125,opt=Small,rtti=Disabled,dbgport=Disabled,dbglvl=None,usbstack=picosdk",
+    "board": "rp2040:rp2040:rpipico",
+    "sketch": "three_little_words.ino",
+    "port": "COM1"
+}
