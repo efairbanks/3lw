@@ -1331,7 +1331,7 @@
     (uuid c1875a70-cce7-4cde-937b-f21f5842a7f5)
     (property "Reference" "J8" (id 0) (at 66.04 170.18 0))
     (property "Value" "SSD1306_OLED_CONN" (id 1) (at 66.04 172.72 0))
-    (property "Footprint" "" (id 2) (at 65.405 180.975 0)
+    (property "Footprint" "Connector_PinSocket_2.54mm:PinSocket_1x04_P2.54mm_Vertical" (id 2) (at 65.405 180.975 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 65.405 180.975 0)

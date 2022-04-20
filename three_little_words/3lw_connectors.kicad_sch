@@ -1100,7 +1100,6 @@
   )
 
 
-
   (wire (pts (xy 125.73 62.357) (xy 124.206 62.357))
     (stroke (width 0) (type default) (color 0 0 0 0))
     (uuid 000732ed-6386-4fd1-a571-3c87aae7b14a)
@@ -2254,7 +2253,7 @@
     (property "Value" "Conn_01x17_Female" (id 1) (at 135.636 73.2789 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "" (id 2) (at 134.112 72.009 0)
+    (property "Footprint" "Connector_PinSocket_2.54mm:PinSocket_1x17_P2.54mm_Vertical" (id 2) (at 134.112 72.009 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 134.112 72.009 0)
@@ -2284,7 +2283,7 @@
     (uuid 1a9c8dc5-fa51-4297-9bc4-36bcbe891c68)
     (property "Reference" "J17" (id 0) (at 186.436 45.847 0))
     (property "Value" "Conn_01x17_Male" (id 1) (at 186.436 48.387 0))
-    (property "Footprint" "" (id 2) (at 184.658 72.009 0)
+    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x17_P2.54mm_Vertical" (id 2) (at 184.658 72.009 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 184.658 72.009 0)
@@ -2318,7 +2317,7 @@
     (property "Value" "Conn_01x14_Female" (id 1) (at 135.89 123.8249 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "" (id 2) (at 134.112 121.285 0)
+    (property "Footprint" "Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical" (id 2) (at 134.112 121.285 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 134.112 121.285 0)
@@ -2345,7 +2344,7 @@
     (uuid aa0ff302-7bf9-4742-941d-932f03772977)
     (property "Reference" "J18" (id 0) (at 187.96 100.203 0))
     (property "Value" "Conn_01x14_Male" (id 1) (at 187.96 102.743 0))
-    (property "Footprint" "" (id 2) (at 185.166 121.285 0)
+    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x14_P2.54mm_Vertical" (id 2) (at 185.166 121.285 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 185.166 121.285 0)
