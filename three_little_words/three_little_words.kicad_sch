@@ -4180,7 +4180,7 @@
     (uuid eba5d6a9-13c8-47c5-a121-bbcc601465b8)
     (property "Reference" "U4" (id 0) (at 126.746 115.316 0))
     (property "Value" "LM1117-3.3" (id 1) (at 126.746 117.856 0))
-    (property "Footprint" "Package_TO_SOT_SMD:SOT-223-3_TabPin2" (id 2) (at 126.746 110.871 0)
+    (property "Footprint" "Package_TO_SOT_THT:TO-220-3_Vertical" (id 2) (at 126.746 110.871 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "http://www.ti.com/lit/ds/symlink/lm1117.pdf" (id 3) (at 126.746 140.716 0)
@@ -4629,13 +4629,13 @@
       (reference "J14") (unit 1) (value "Eurorack_Mono_Jack") (footprint "winterbloom:WQP518MA")
     )
     (path "/5981d953-5498-4062-b4cd-933f794f0a13/064527ab-1b88-439a-b7a6-ecfa330b715a"
-      (reference "J15") (unit 1) (value "Conn_01x17_Female") (footprint "Connector_PinSocket_2.54mm:PinSocket_1x17_P2.54mm_Vertical")
+      (reference "J15") (unit 1) (value "Conn_01x14_Female") (footprint "Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical")
     )
     (path "/5981d953-5498-4062-b4cd-933f794f0a13/66fc7aba-df2f-4319-860b-d967c2d72e88"
       (reference "J16") (unit 1) (value "Conn_01x14_Female") (footprint "Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical")
     )
     (path "/5981d953-5498-4062-b4cd-933f794f0a13/1a9c8dc5-fa51-4297-9bc4-36bcbe891c68"
-      (reference "J17") (unit 1) (value "Conn_01x17_Male") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x17_P2.54mm_Vertical")
+      (reference "J17") (unit 1) (value "Conn_01x14_Male") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x14_P2.54mm_Vertical")
     )
     (path "/5981d953-5498-4062-b4cd-933f794f0a13/aa0ff302-7bf9-4742-941d-932f03772977"
       (reference "J18") (unit 1) (value "Conn_01x14_Male") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x14_P2.54mm_Vertical")
@@ -4803,7 +4803,7 @@
       (reference "U3") (unit 3) (value "NE5532") (footprint "Package_DIP:DIP-8_W7.62mm")
     )
     (path "/eba5d6a9-13c8-47c5-a121-bbcc601465b8"
-      (reference "U4") (unit 1) (value "LM1117-3.3") (footprint "Package_TO_SOT_SMD:SOT-223-3_TabPin2")
+      (reference "U4") (unit 1) (value "LM1117-3.3") (footprint "Package_TO_SOT_THT:TO-220-3_Vertical")
     )
     (path "/7c4b8d5d-82e5-4d8e-b466-275209dde4d0"
       (reference "U5") (unit 1) (value "Pico") (footprint "MCU_RaspberryPi_and_Boards:RPi_Pico_SMD_TH")
