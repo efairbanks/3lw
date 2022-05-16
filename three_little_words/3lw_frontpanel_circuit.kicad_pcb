@@ -1,0 +1,282 @@
+(kicad_pcb (version 20211014) (generator pcbnew)
+
+  (general
+    (thickness 1.6)
+  )
+
+  (paper "A4")
+  (layers
+    (0 "F.Cu" signal)
+    (31 "B.Cu" signal)
+    (32 "B.Adhes" user "B.Adhesive")
+    (33 "F.Adhes" user "F.Adhesive")
+    (34 "B.Paste" user)
+    (35 "F.Paste" user)
+    (36 "B.SilkS" user "B.Silkscreen")
+    (37 "F.SilkS" user "F.Silkscreen")
+    (38 "B.Mask" user)
+    (39 "F.Mask" user)
+    (40 "Dwgs.User" user "User.Drawings")
+    (41 "Cmts.User" user "User.Comments")
+    (42 "Eco1.User" user "User.Eco1")
+    (43 "Eco2.User" user "User.Eco2")
+    (44 "Edge.Cuts" user)
+    (45 "Margin" user)
+    (46 "B.CrtYd" user "B.Courtyard")
+    (47 "F.CrtYd" user "F.Courtyard")
+    (48 "B.Fab" user)
+    (49 "F.Fab" user)
+    (50 "User.1" user)
+    (51 "User.2" user)
+    (52 "User.3" user)
+    (53 "User.4" user)
+    (54 "User.5" user)
+    (55 "User.6" user)
+    (56 "User.7" user)
+    (57 "User.8" user)
+    (58 "User.9" user)
+  )
+
+  (setup
+    (stackup
+      (layer "F.SilkS" (type "Top Silk Screen"))
+      (layer "F.Paste" (type "Top Solder Paste"))
+      (layer "F.Mask" (type "Top Solder Mask") (thickness 0.01))
+      (layer "F.Cu" (type "copper") (thickness 0.035))
+      (layer "dielectric 1" (type "core") (thickness 1.51) (material "FR4") (epsilon_r 4.5) (loss_tangent 0.02))
+      (layer "B.Cu" (type "copper") (thickness 0.035))
+      (layer "B.Mask" (type "Bottom Solder Mask") (thickness 0.01))
+      (layer "B.Paste" (type "Bottom Solder Paste"))
+      (layer "B.SilkS" (type "Bottom Silk Screen"))
+      (copper_finish "None")
+      (dielectric_constraints no)
+    )
+    (pad_to_mask_clearance 0)
+    (pcbplotparams
+      (layerselection 0x00010fc_ffffffff)
+      (disableapertmacros false)
+      (usegerberextensions true)
+      (usegerberattributes false)
+      (usegerberadvancedattributes false)
+      (creategerberjobfile false)
+      (svguseinch false)
+      (svgprecision 6)
+      (excludeedgelayer true)
+      (plotframeref false)
+      (viasonmask false)
+      (mode 1)
+      (useauxorigin false)
+      (hpglpennumber 1)
+      (hpglpenspeed 20)
+      (hpglpendiameter 15.000000)
+      (dxfpolygonmode true)
+      (dxfimperialunits true)
+      (dxfusepcbnewfont true)
+      (psnegative false)
+      (psa4output false)
+      (plotreference true)
+      (plotvalue false)
+      (plotinvisibletext false)
+      (sketchpadsonfab false)
+      (subtractmaskfromsilk true)
+      (outputformat 1)
+      (mirror false)
+      (drillshape 0)
+      (scaleselection 1)
+      (outputdirectory "3lw_panel_gerbers/")
+    )
+  )
+
+  (net 0 "")
+
+  (footprint "winterbloom:MountingHole_M3_Slotted_Eurorack" (layer "F.Cu")
+    (tedit 5E5DD340) (tstamp 083186f9-ddf3-42e4-9683-e45826936abd)
+    (at 73.088156 22.982 180)
+    (descr "Mounting Hole 3.2mm, no annular, M3")
+    (tags "mounting hole 3.2mm no annular m3")
+    (attr exclude_from_pos_files exclude_from_bom)
+    (fp_text reference " " (at 0 -2.7) (layer "F.Fab") hide
+      (effects (font (size 1 1) (thickness 0.15)))
+      (tstamp b9439f77-f332-4d10-8361-7a7253a0d1e7)
+    )
+    (fp_text value " " (at 0 3) (layer "F.Fab") hide
+      (effects (font (size 1 1) (thickness 0.15)))
+      (tstamp 317ca6c1-2fa3-4c94-802f-886664921fc3)
+    )
+    (fp_line (start 0 -3) (end -0.3 -2.7) (layer "F.CrtYd") (width 0.12) (tstamp 1e4612c7-2d2e-4e1f-987f-d958ed1f167f))
+    (fp_line (start -0.3 -2.7) (end 0 -3) (layer "F.CrtYd") (width 0.12) (tstamp 28454e33-ec7d-4b67-88c3-8605299d09c8))
+    (fp_line (start -7.5 0) (end -7.3 0.2) (layer "F.CrtYd") (width 0.12) (tstamp 3f1aa213-f9ce-4b8a-8833-c07f1b3ccb48))
+    (fp_line (start 0 3) (end 0.3 2.7) (layer "F.CrtYd") (width 0.12) (tstamp 55f99003-8427-49cd-93ac-1418efb09cb2))
+    (fp_line (start 0 -3) (end 0.3 -2.7) (layer "F.CrtYd") (width 0.12) (tstamp 60f3e12a-b42b-442c-a03f-bdc30c246528))
+    (fp_line (start 0 0) (end -7.5 0) (layer "F.CrtYd") (width 0.12) (tstamp 6b25b0ec-6ee4-4f25-8ab6-3827592290f4))
+    (fp_line (start -7.5 0) (end -7.3 -0.2) (layer "F.CrtYd") (width 0.12) (tstamp 8a949a04-66a9-4c3c-8cbb-72af311c8714))
+    (fp_line (start 0 3) (end -0.3 2.7) (layer "F.CrtYd") (width 0.12) (tstamp 8e8a493f-84aa-48a0-96e8-da2d0fe40b95))
+    (fp_line (start 0 0) (end 0 3) (layer "F.CrtYd") (width 0.12) (tstamp ab5998c0-85f2-4e60-93de-106530e09362))
+    (fp_line (start 0.3 2.7) (end 0 3) (layer "F.CrtYd") (width 0.12) (tstamp f44e4748-12fb-4c8a-a550-b587e003edf8))
+    (fp_line (start 0 0) (end 0 -3) (layer "F.CrtYd") (width 0.12) (tstamp f9d9dc7e-92ac-4002-a76d-6296a7cd99d3))
+    (pad "" np_thru_hole roundrect locked (at 0 0 180) (size 4 3.2) (drill oval 4 3.2) (layers *.Cu *.Mask) (roundrect_rratio 0.5) (tstamp faa714c8-818c-49aa-8363-e3be06bea8be))
+  )
+
+  (footprint "winterbloom:MountingHole_M3_Slotted_Eurorack" (layer "F.Cu")
+    (tedit 5E5DD340) (tstamp 69543aa1-151d-4078-bdc1-be7b99d1f87e)
+    (at 27.498156 145.462)
+    (descr "Mounting Hole 3.2mm, no annular, M3")
+    (tags "mounting hole 3.2mm no annular m3")
+    (attr exclude_from_pos_files exclude_from_bom)
+    (fp_text reference " " (at 0 -2.7) (layer "F.Fab") hide
+      (effects (font (size 1 1) (thickness 0.15)))
+      (tstamp 10b3dc10-bd86-4aa3-964f-f956bfc755ee)
+    )
+    (fp_text value " " (at 0 3) (layer "F.Fab") hide
+      (effects (font (size 1 1) (thickness 0.15)))
+      (tstamp 3eddf762-8d7a-4567-bab0-716eba5b6348)
+    )
+    (fp_line (start -7.5 0) (end -7.3 0.2) (layer "F.CrtYd") (width 0.12) (tstamp 0a4d5bac-3cca-4df3-8212-686fc1aad14a))
+    (fp_line (start 0 0) (end -7.5 0) (layer "F.CrtYd") (width 0.12) (tstamp 1b9c7e95-5165-4269-826c-63f1afad7575))
+    (fp_line (start 0 3) (end -0.3 2.7) (layer "F.CrtYd") (width 0.12) (tstamp 244d04ca-0aea-4df6-a8f9-8cdf2f33e86d))
+    (fp_line (start 0 -3) (end -0.3 -2.7) (layer "F.CrtYd") (width 0.12) (tstamp 458f3466-90a4-4d75-a7f9-cc03b260ee38))
+    (fp_line (start 0 0) (end 0 -3) (layer "F.CrtYd") (width 0.12) (tstamp 52e7b6bb-095c-41f8-954a-0e91f6ceb834))
+    (fp_line (start -7.5 0) (end -7.3 -0.2) (layer "F.CrtYd") (width 0.12) (tstamp 5e3d2134-a2bc-4500-ac63-a74d427d1906))
+    (fp_line (start 0.3 2.7) (end 0 3) (layer "F.CrtYd") (width 0.12) (tstamp 8f7c9d84-6df4-4da4-b0ec-a2d6c51d0a5e))
+    (fp_line (start 0 -3) (end 0.3 -2.7) (layer "F.CrtYd") (width 0.12) (tstamp 9224d981-dc16-495c-8bef-f117e247eee8))
+    (fp_line (start 0 3) (end 0.3 2.7) (layer "F.CrtYd") (width 0.12) (tstamp bdc51a32-9579-43d8-abe6-d6d0fcfda9fb))
+    (fp_line (start -0.3 -2.7) (end 0 -3) (layer "F.CrtYd") (width 0.12) (tstamp c36083ee-d247-403f-837c-cf07c0e47075))
+    (fp_line (start 0 0) (end 0 3) (layer "F.CrtYd") (width 0.12) (tstamp c867e96f-a148-43ea-b58b-547538faed1a))
+    (pad "" np_thru_hole roundrect locked (at 0 0) (size 4 3.2) (drill oval 4 3.2) (layers *.Cu *.Mask) (roundrect_rratio 0.5) (tstamp 2b8aff06-4a2d-4352-ba05-0b92a836938b))
+  )
+
+  (footprint "winterbloom:MountingHole_M3_Slotted_Eurorack" (layer "F.Cu")
+    (tedit 5E5DD340) (tstamp 6d5477be-4c6c-4017-a90b-7a55e62be098)
+    (at 73.088156 145.472 180)
+    (descr "Mounting Hole 3.2mm, no annular, M3")
+    (tags "mounting hole 3.2mm no annular m3")
+    (attr exclude_from_pos_files exclude_from_bom)
+    (fp_text reference " " (at 0 -2.7) (layer "F.Fab") hide
+      (effects (font (size 1 1) (thickness 0.15)))
+      (tstamp b766fba3-ed3c-4f2a-a7b1-a58173e2399a)
+    )
+    (fp_text value " " (at 0 3) (layer "F.Fab") hide
+      (effects (font (size 1 1) (thickness 0.15)))
+      (tstamp 56debd93-4345-487f-acb9-09e1591e88c2)
+    )
+    (fp_line (start -0.3 -2.7) (end 0 -3) (layer "F.CrtYd") (width 0.12) (tstamp 1129c821-4221-413a-b124-7cd2b452dee3))
+    (fp_line (start -7.5 0) (end -7.3 -0.2) (layer "F.CrtYd") (width 0.12) (tstamp 31d3bb61-3ab8-4ee5-98f7-19fcbef58004))
+    (fp_line (start -7.5 0) (end -7.3 0.2) (layer "F.CrtYd") (width 0.12) (tstamp 5a703fbc-431f-40f4-ad99-bbe431b7f329))
+    (fp_line (start 0.3 2.7) (end 0 3) (layer "F.CrtYd") (width 0.12) (tstamp 702adbad-cc32-40cc-8557-12ccbcc447f5))
+    (fp_line (start 0 3) (end -0.3 2.7) (layer "F.CrtYd") (width 0.12) (tstamp 7b448334-a672-4f67-8bb7-9dc7daa7fefe))
+    (fp_line (start 0 0) (end 0 -3) (layer "F.CrtYd") (width 0.12) (tstamp 7da14e3c-031d-42a9-a820-92c0765992b7))
+    (fp_line (start 0 -3) (end -0.3 -2.7) (layer "F.CrtYd") (width 0.12) (tstamp 91c9312f-49bd-43e5-9ab5-9233b64d7f4a))
+    (fp_line (start 0 0) (end 0 3) (layer "F.CrtYd") (width 0.12) (tstamp a73753d8-f00b-4be9-a8c8-167668e414ea))
+    (fp_line (start 0 3) (end 0.3 2.7) (layer "F.CrtYd") (width 0.12) (tstamp ab1be128-b506-44db-b353-1b6cf0f1bff8))
+    (fp_line (start 0 -3) (end 0.3 -2.7) (layer "F.CrtYd") (width 0.12) (tstamp c11800a1-7754-4ac5-a9a8-c6989ec2e1ac))
+    (fp_line (start 0 0) (end -7.5 0) (layer "F.CrtYd") (width 0.12) (tstamp e494b54b-7300-4f8c-8bb9-32c84d3e63f0))
+    (pad "" np_thru_hole roundrect locked (at 0 0 180) (size 4 3.2) (drill oval 4 3.2) (layers *.Cu *.Mask) (roundrect_rratio 0.5) (tstamp aec76fa7-ca3b-4002-827b-890c008964e6))
+  )
+
+  (footprint "winterbloom:MountingHole_M3_Slotted_Eurorack" (layer "F.Cu")
+    (tedit 5E5DD340) (tstamp 6f4f56db-55fa-410c-8dc2-36dbeb49249c)
+    (at 27.508156 23.002)
+    (descr "Mounting Hole 3.2mm, no annular, M3")
+    (tags "mounting hole 3.2mm no annular m3")
+    (attr exclude_from_pos_files exclude_from_bom)
+    (fp_text reference " " (at 0 -2.7) (layer "F.Fab") hide
+      (effects (font (size 1 1) (thickness 0.15)))
+      (tstamp b73189eb-ce33-4fd6-899f-a0fe6fefce38)
+    )
+    (fp_text value " " (at 0 3) (layer "F.Fab") hide
+      (effects (font (size 1 1) (thickness 0.15)))
+      (tstamp 2cde09e2-1478-4e90-84f2-de808fbc4e00)
+    )
+    (fp_line (start 0 0) (end -7.5 0) (layer "F.CrtYd") (width 0.12) (tstamp 09518f18-8c5c-4629-8039-76c971a8c2f1))
+    (fp_line (start -0.3 -2.7) (end 0 -3) (layer "F.CrtYd") (width 0.12) (tstamp 2687370f-49a5-4bc5-9d99-d875739be787))
+    (fp_line (start 0 3) (end 0.3 2.7) (layer "F.CrtYd") (width 0.12) (tstamp 4035c6d5-0218-4683-a405-7b7b1fd841f8))
+    (fp_line (start 0.3 2.7) (end 0 3) (layer "F.CrtYd") (width 0.12) (tstamp 4b8be3ff-4f25-49f4-9eee-d26026895d38))
+    (fp_line (start 0 0) (end 0 3) (layer "F.CrtYd") (width 0.12) (tstamp 52039751-7c90-4bad-b446-00e9c6094980))
+    (fp_line (start 0 0) (end 0 -3) (layer "F.CrtYd") (width 0.12) (tstamp 6cfdc61e-9238-4bf1-8adc-0aa2afd5e23c))
+    (fp_line (start -7.5 0) (end -7.3 0.2) (layer "F.CrtYd") (width 0.12) (tstamp 875d8101-02ec-4109-9cb3-dc03033ea564))
+    (fp_line (start 0 3) (end -0.3 2.7) (layer "F.CrtYd") (width 0.12) (tstamp 8f3eb88d-9ce9-4013-ad67-32b8876a01b4))
+    (fp_line (start 0 -3) (end 0.3 -2.7) (layer "F.CrtYd") (width 0.12) (tstamp 9c352ce5-8dcd-4676-8f85-0d97597fd098))
+    (fp_line (start 0 -3) (end -0.3 -2.7) (layer "F.CrtYd") (width 0.12) (tstamp dc907d3a-ade0-4fb2-bac6-3f031f194fac))
+    (fp_line (start -7.5 0) (end -7.3 -0.2) (layer "F.CrtYd") (width 0.12) (tstamp dfdae403-bb08-48d4-b042-b5f0fa182e90))
+    (pad "" np_thru_hole roundrect locked (at 0 0) (size 4 3.2) (drill oval 4 3.2) (layers *.Cu *.Mask) (roundrect_rratio 0.5) (tstamp 646cbadb-b1e3-4f3d-b836-1d0a4642fad3))
+  )
+
+  (gr_line (start 19.99 84.23) (end 80.5944 84.23) (layer "Dwgs.User") (width 0.15) (tstamp 71323da5-c5b7-46a3-8a53-9f8f9cdac18b))
+  (gr_line (start 50.29 19.98) (end 50.29 148.4532) (layer "Dwgs.User") (width 0.15) (tstamp e895bb6b-eb03-424b-9f66-0cca55fa9156))
+  (gr_circle (center 32.788156 100.932) (end 35.988156 100.932) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp 01feeb10-51bb-439b-a673-a50e12c4098c))
+  (gr_circle (center 67.498156 122.612) (end 70.698156 122.612) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp 086e8d1b-c8ac-4b8e-9264-3d378fe33ce5))
+  (gr_rect (start 34.815356 44.6264) (end 65.771356 61.9172) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp 11422d0e-6b99-404c-9dbb-28375f045127))
+  (gr_circle (center 67.468156 110.992) (end 70.668156 110.992) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp 14b6e41c-d92e-4cb7-b5a7-1e2bc6c8daa7))
+  (gr_rect (start 19.99 19.98) (end 80.59 148.48) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp 49665ed5-05ef-4281-b57f-c992029580a5))
+  (gr_circle (center 50.285195 79.9672) (end 52.367995 82.5072) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp 83ab026c-b12c-49d5-b7c0-d6b01e553901))
+  (gr_circle (center 28.28 37.244294) (end 31.48 37.244294) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp 89411690-e54e-4449-bfe8-982deb1c2353))
+  (gr_circle (center 50.318156 35.332) (end 52.568156 35.332) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp 9d3e03af-a066-417d-adb1-38a17df3fa96))
+  (gr_circle (center 32.784595 79.9672) (end 34.867395 82.5072) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp a3f60401-6f48-4300-aeb7-3c7c01c443d6))
+  (gr_circle (center 67.430195 79.9926) (end 69.512995 82.5326) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp a6f7b64b-4c95-4302-8191-ebe0c19a46ac))
+  (gr_circle (center 50.278156 122.612) (end 53.478156 122.612) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp b6545b74-4ea4-42e9-b9a4-db46316894c7))
+  (gr_circle (center 40.273108 35.314) (end 42.523108 35.314) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp b7adda53-4289-41a3-b5b4-80bbeae69fed))
+  (gr_circle (center 32.818156 111.052) (end 36.018156 111.052) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp bc92abf6-a869-40f8-8d2e-c4044aa15266))
+  (gr_circle (center 60.378156 35.322) (end 62.628156 35.322) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp d802296b-577d-4271-8433-f46e61f09e7f))
+  (gr_circle (center 67.458156 100.902) (end 70.658156 100.902) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp d8c860b9-9dcb-4b78-b50e-ed05da6d0c0d))
+  (gr_circle (center 50.258156 100.902) (end 53.458156 100.902) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp ddbd29ee-ac46-4ab8-937d-73198d8adf69))
+  (gr_circle (center 67.488156 132.872) (end 70.688156 132.872) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp df2e5afe-7644-4dc3-972b-ed968c428b6f))
+  (gr_circle (center 50.278156 111.022) (end 53.478156 111.022) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp f536a89d-8173-482c-b1eb-2304eae5af8d))
+  (gr_circle (center 32.838156 122.642) (end 36.038156 122.642) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp f56648cb-3b1f-45f3-8109-a806c8d0de7d))
+  (gr_circle (center 32.858156 132.932) (end 36.058156 132.932) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp f7be9746-f4af-49a1-bb78-eeec47403c70))
+  (gr_circle (center 50.288156 132.912) (end 53.488156 132.912) (layer "Edge.Cuts") (width 0.1) (fill none) (tstamp fb72ce72-9a9e-496b-99b8-3777238af45c))
+  (gr_text "JLCJLCJLCJLC" (at 50.38 145.77) (layer "B.SilkS") (tstamp ef5eb8ac-41d6-4007-a96f-af29bbeb13fe)
+    (effects (font (size 1 1) (thickness 0.15)) (justify mirror))
+  )
+
+  (group "" (id 1599eca0-14e9-4594-b8e1-c3ac992de321)
+    (members
+      887e7568-cfc8-4007-bc4e-5d5ff5bf8ff0
+      89411690-e54e-4449-bfe8-982deb1c2353
+    )
+  )
+  (group "" (id 4ad88005-8894-4d73-b222-6b6a54854851)
+    (members
+      49665ed5-05ef-4281-b57f-c992029580a5
+      71323da5-c5b7-46a3-8a53-9f8f9cdac18b
+      e895bb6b-eb03-424b-9f66-0cca55fa9156
+    )
+  )
+  (group "" (id 5915f295-ef94-4309-903a-3bcb10cdf7a6)
+    (members
+      01feeb10-51bb-439b-a673-a50e12c4098c
+      086e8d1b-c8ac-4b8e-9264-3d378fe33ce5
+      11422d0e-6b99-404c-9dbb-28375f045127
+      14b6e41c-d92e-4cb7-b5a7-1e2bc6c8daa7
+      4ad88005-8894-4d73-b222-6b6a54854851
+      83ab026c-b12c-49d5-b7c0-d6b01e553901
+      9d3e03af-a066-417d-adb1-38a17df3fa96
+      a3f60401-6f48-4300-aeb7-3c7c01c443d6
+      a6f7b64b-4c95-4302-8191-ebe0c19a46ac
+      b6545b74-4ea4-42e9-b9a4-db46316894c7
+      b7adda53-4289-41a3-b5b4-80bbeae69fed
+      bc92abf6-a869-40f8-8d2e-c4044aa15266
+      d802296b-577d-4271-8433-f46e61f09e7f
+      d8c860b9-9dcb-4b78-b50e-ed05da6d0c0d
+      ddbd29ee-ac46-4ab8-937d-73198d8adf69
+      df2e5afe-7644-4dc3-972b-ed968c428b6f
+      f536a89d-8173-482c-b1eb-2304eae5af8d
+      f56648cb-3b1f-45f3-8109-a806c8d0de7d
+      f7be9746-f4af-49a1-bb78-eeec47403c70
+      fb72ce72-9a9e-496b-99b8-3777238af45c
+    )
+  )
+  (group "" (id 74430741-8835-4104-bfe9-c337303056d3)
+    (members
+      5915f295-ef94-4309-903a-3bcb10cdf7a6
+    )
+  )
+  (group "" (id 887e7568-cfc8-4007-bc4e-5d5ff5bf8ff0)
+    (members
+      083186f9-ddf3-42e4-9683-e45826936abd
+      69543aa1-151d-4078-bdc1-be7b99d1f87e
+      6d5477be-4c6c-4017-a90b-7a55e62be098
+      6f4f56db-55fa-410c-8dc2-36dbeb49249c
+      74430741-8835-4104-bfe9-c337303056d3
+    )
+  )
+)
