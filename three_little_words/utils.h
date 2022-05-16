@@ -1,10 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "pico/stdlib.h"
 #include <math.h>
-
-float wrap(float* a, float t, int s) {
-  return a[((int)floor(t))%s];
-}
+#include "constants.h"
 
 #endif
