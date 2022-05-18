@@ -12,6 +12,8 @@
 #include "apps.h"
 #include "dsp.h"
 
+TLWHardware hw;
+
 class App {
 public:
   App() {}
@@ -23,6 +25,31 @@ public:
   virtual void Process() {}
 };
 
+class Info : public App {
+public:
+  Info(int x, int y, int width, int height, int len) {
+  }
+  void UpdateDisplay() {
+    char buffer[32];
+    for(int i=0;i<3;i++) {
+      sprintf(buffer, "ENC_%d: v%d p%d h%d",
+              i,
+              hw.control[i]->encValue,
+              hw.control[i]->encButtonPressed(),
+              hw.control[i]->encButtonHeld);
+      hw.display->drawStr(0, 0 + 16*i, buffer);
+      sprintf(buffer, "BTN_%d: p%d h%d",
+        i,
+        hw.control[i]->topButtonPressed(),
+        hw.control[i]->topButtonHeld);
+      hw.display->drawStr(0, 8 + 16*i, buffer);
+    }
+  }
+  void Process() {
+  }
+};
+
+/*
 class Seq : public App {
 public:
   int len;
@@ -64,10 +91,10 @@ public:
     for(int i=0;i<len;i++) {
       float height = 56*values[i];
       float padding = 1.0;
-      u8g2.drawRBox(i*colWidth, 56-height, max(1,colWidth-1), height, 2);
+      hw.display->drawRBox(i*colWidth, 56-height, max(1,colWidth-1), height, 2);
     }
-    u8g2.drawRBox(this->selectedParam*colWidth, 57, colWidth, 3, 1);
-    u8g2.drawRBox(this->playingParam*colWidth, 61, colWidth, 3, 1);
+    hw.display->drawRBox(this->selectedParam*colWidth, 57, colWidth, 3, 1);
+    hw.display->drawRBox(this->playingParam*colWidth, 61, colWidth, 3, 1);
   }
   void Process() {
     phase+=10.0/SAMPLE_RATE;
@@ -108,7 +135,7 @@ public:
   void UpdateDisplay() {
     char buffer[32];
     sprintf(buffer, "input: %f", lastVal);
-    u8g2.drawStr(0, 0, buffer);
+    hw.display->drawStr(0, 0, buffer);
   }
   void Process() {
     while(!adc_fifo_is_empty()) {
@@ -160,14 +187,14 @@ public:
   void IncParam() {}
   void UpdateDisplay() {
     char buffer[32];
-    sprintf(buffer, "input: %4fv", /*lastVal);*/(lastVal-1.666)*3.0);
-    u8g2.drawStr(0, 0, buffer);
-    sprintf(buffer, "max:   %4fv", /*maxVal);*/(maxVal-1.666)*3.0);
-    u8g2.drawStr(0, 12, buffer);
-    sprintf(buffer, "min:   %4fv", /*minVal);*/(minVal-1.666)*3.0);
-    u8g2.drawStr(0, 24, buffer);
-    sprintf(buffer, "avg:   %4fv", /*minVal);*/(avgVal-1.666)*3.0);
-    u8g2.drawStr(0, 36, buffer);
+    sprintf(buffer, "input: %4fv", (lastVal-1.666)*3.0);
+    hw.display->drawStr(0, 0, buffer);
+    sprintf(buffer, "max:   %4fv", (maxVal-1.666)*3.0);
+    hw.display->drawStr(0, 12, buffer);
+    sprintf(buffer, "min:   %4fv", (minVal-1.666)*3.0);
+    hw.display->drawStr(0, 24, buffer);
+    sprintf(buffer, "avg:   %4fv", (avgVal-1.666)*3.0);
+    hw.display->drawStr(0, 36, buffer);
   }
   void Process() {
     while(!adc_fifo_is_empty()) {
@@ -206,11 +233,11 @@ public:
   void UpdateDisplay() {
     char buffer[32];
     sprintf(buffer, "tri: %dHz", 220);
-    u8g2.drawStr(0, 5, buffer);
+    hw.display->drawStr(0, 5, buffer);
     sprintf(buffer, "saw: %dHz", 275);
-    u8g2.drawStr(0, 15, buffer);
+    hw.display->drawStr(0, 15, buffer);
     sprintf(buffer, "pulse: %dHz", 330);
-    u8g2.drawStr(0, 25, buffer);
+    hw.display->drawStr(0, 25, buffer);
   }
   void Process() {
     triOut->RawSet(2, FP_MUL(tri->Process(), 127) + 127);
@@ -222,37 +249,53 @@ public:
   }
 };
 
-class Info : public App {
+class EncoderTest : public App {
 public:
-  AnalogOut* analogOut;
-  Tri* carrier;
-  Tri* modulator;
-  Saw* lfo;
-  Info(int x, int y, int width, int height, int len) {
-    carrier = new Tri(220);
-    modulator = new Tri(345);
-    lfo = new Saw(1);
+  int ccwPresses;
+  int cwPresses;
+  int state;
+  uint32_t samples;
+  uint32_t lastSampleTriggered;
+  EncoderTest(int x, int y, int width, int height, int len) {
+    ccwPresses = 0;
+    cwPresses = 0;
+    state = 0;
+    samples = 0;
+    lastSampleTriggered = 0;
   }
   void UpdateDisplay() {
     char buffer[32];
-    sprintf(buffer, "TIMER: %d", TIMER_INTERVAL);
-    u8g2.drawStr(0, 0, buffer);
-    sprintf(buffer, "SR: %f", SAMPLE_RATE);
-    u8g2.drawStr(0, 8, buffer);
-    sprintf(buffer, "OFF_VMAX: %f", OFFSET_VMAX);
-    u8g2.drawStr(0, 16, buffer);
-    sprintf(buffer, "OUT_VMAX: %f", OUTPUT_VMAX);
-    u8g2.drawStr(0, 24, buffer);
-    sprintf(buffer, "BTN_A: %d", btn_a.Held());
-    u8g2.drawStr(0, 32, buffer);
-    sprintf(buffer, "BTN_B: %d", btn_b.Held());
-    u8g2.drawStr(0, 40, buffer);
-    sprintf(buffer, "BTN_C: %d", btn_c.Held());
-    u8g2.drawStr(0, 48, buffer);
+    sprintf(buffer, "ccws: %d", ccwPresses);
+    hw.display->drawStr(0, 0, buffer);
+    sprintf(buffer, "cws: %d", cwPresses);
+    hw.display->drawStr(0, 8, buffer);
+    sprintf(buffer, "sampSince: %d", (samples - lastSampleTriggered));
+    hw.display->drawStr(0, 16, buffer);
+  }
+  void DecParam() {
+    if(state == 0 && (samples - lastSampleTriggered) > 1000) {
+      state = -1;
+    }
+    if(state == 1) {
+      cwPresses++;
+      state = 0;
+      lastSampleTriggered = samples;
+    }
+  }
+  void IncParam() {
+    if(state == 0 && (samples - lastSampleTriggered) > 1000) {
+      state = 1;
+    }
+    if(state == -1) {
+      state = 0;
+      ccwPresses++;
+      lastSampleTriggered = samples;
+    }
   }
   void Process() {
-
+    samples++;
   }
 };
+*/
 
 #endif
