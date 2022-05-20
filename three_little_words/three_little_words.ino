@@ -10,10 +10,7 @@
 #include "apps.h"
 #include "dsp.h"
 
-struct repeating_timer timer;
-
-typedef enum 
-{ 
+typedef enum { 
   PAGE_SELECT,
   PARAM_SELECT,
   PARAM_MODIFY
@@ -24,28 +21,25 @@ InputMode mode = PARAM_MODIFY;
 App* apps[NUM_APPS];
 int currentApp = 0;
 
-bool audio_callback(struct repeating_timer *t) {
+void audio_callback() {
   App* app = apps[currentApp];
   app->Process();
-  return true;
 }
 
 void setup() {
-  hw.Init();
   apps[0] = new Info(0,0,128,64,16);
-  add_repeating_timer_us(-TIMER_INTERVAL, audio_callback, NULL, &timer);
+  hw.Init(audio_callback);
 }
 
 void loop() {
+  hw.Update();
+
   hw.display->setFont(u8g_font_6x10);
   hw.display->setFontRefHeightExtendedText();
   hw.display->setDrawColor(1);
   hw.display->setFontPosTop();
   hw.display->setFontDirection(0);
   hw.display->clearBuffer();
-  
-  hw.Update();
-
   apps[currentApp]->UpdateDisplay();
   hw.display->sendBuffer();
 }

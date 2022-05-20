@@ -19,11 +19,47 @@
 #define NUM_WORDS 3
 
 uint TOP_BTN_CCW[] = {0, 16, 21};
-uint ENC_BTN_CW[]  = {1,17,22};
+uint ENC_BTN_CW[]  = {1, 17, 22};
 uint TRIG_IN[]     = {18, 19, 20};
 uint CV_IN[]       = {26, 27, 28};
-uint VOCT_OFFSET[] = {2, 6, 8};
+uint VOCT_OFFSET[] = {2,  6,  8};
 uint CV_OFFSET[]   = {10, 12, 14};
+
+class GateTrigger {
+public:
+  uint pin;
+  bool state;
+  bool fallingEdge;
+  bool risingEdge;
+  GateTrigger(uint pin) {
+    this->pin = pin;
+    this->state = false;
+    this->fallingEdge = false;
+    this->risingEdge = false;
+    gpio_pull_up(pin);
+  }
+  void Update() {
+    bool newState = !gpio_get(pin);
+    if(newState > state) this->risingEdge = true;
+    if(newState < state) this->fallingEdge = true;
+    this->state = newState; 
+  }
+  bool State() { return state; }
+  bool FallingEdge() {
+    if(fallingEdge) {
+      fallingEdge = false;
+      return true;
+    }
+    return false;
+  }
+  bool RisingEdge() {
+    if(risingEdge) {
+      risingEdge = false;
+      return true;
+    }
+    return false;
+  }
+};
 
 class ButtonAndEncoder {
 private:
@@ -48,7 +84,7 @@ public:
     _topButtonPressed = false;
     return out;
   }
-    bool encButtonPressed() {
+  bool encButtonPressed() {
     bool out = _encButtonPressed;
     _encButtonPressed = false;
     return out;
@@ -68,6 +104,12 @@ public:
     gpio_pull_up(encButtonCW);
   }
 
+  int GetDelta() {
+    int delta = encValue;
+    encValue = 0;
+    return delta;
+  }
+
   void Update() {
     if(time_us_64() > (nextCanTrigger + delayTime)) {
       bool topButtonState = !gpio_get(topButtonCCW);
@@ -81,7 +123,6 @@ public:
       state = NONE;
     }
   }
-
   void Update(uint pin, uint32_t events) {
     switch(state) {
       case NONE:
@@ -118,11 +159,11 @@ public:
 class AnalogOut {
 public:
   uint16_t res;
-  uint8_t offset;
-  AnalogOut(int numPins, int resolution = 255, int offset=2) {
-    this->res = resolution;
+  uint offset;
+  AnalogOut(int offset, int resolution = 255) {
     this->offset = offset;
-    for(uint16_t i=0;i<numPins;i++) {
+    this->res = resolution;
+    for(uint16_t i=0;i<2;i++) {
       uint slice_num = pwm_gpio_to_slice_num(i + offset);
       pwm_config cfg = pwm_get_default_config();
       pwm_config_set_clkdiv_int(&cfg, 1);
@@ -132,46 +173,55 @@ public:
       pwm_set_gpio_level(i + offset, 0);
     }
   }
-  void RawSet(uint pin, uint16_t level) {
-    pwm_set_gpio_level(pin, level);
+  void Set(uint pin, double level) {
+    pwm_set_gpio_level(pin, (uint16_t)(level*this->res));
   }
-  void Set(uint pin, float level) {
-    pwm_set_gpio_level(pin + offset, (uint16_t)(level*this->res));
+  void SetOutputVoltage(double v) {
+    Set(offset, ((VOCT_NOUT_MAX-v))/VOCT_NOUT_MAX);
   }
-  void SetOutputVoltage(uint pin, float v) {
-    Set(pin, ((OUTPUT_VMAX-v))/OUTPUT_VMAX);
-  }
-  void SetOffsetVoltage(uint pin, float v) {
-    Set(pin, (v)/OFFSET_VMAX);
+  void SetOffsetVoltage(double v) {
+    Set(offset + 1, (v)/VOCT_POUT_MAX);
   }
 };
 
 class TLWHardware {
 public:
   static TLWHardware* _tlwhw_;
+  static void (*_audioCallback_)(void);
+  struct repeating_timer _timer_;
+
   U8G2_SSD1306_128X64_NONAME_F_HW_I2C* display;
   ButtonAndEncoder* control[NUM_WORDS];
+  GateTrigger* trigIn[NUM_WORDS];
   AnalogOut* voctOut[NUM_WORDS];
   AnalogOut* cvOut[NUM_WORDS];
 
-  static void controlCallback(uint gpio, uint32_t events) {
+  static void controlHandler(uint gpio, uint32_t events) {
     for(int i=0; i<NUM_WORDS; i++) {
       _tlwhw_->control[i]->Update(gpio, events);
     }
   }
 
-  void Init() {
+  static bool audioHandler(struct repeating_timer *t) {
+    if(_audioCallback_ != NULL) _audioCallback_();
+    return true;
+  }
+
+  void Init(void (*audioCallback)(void)) {
     if(_tlwhw_ == NULL) {
       display = new U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, U8X8_PIN_NONE, 5, 4);
       display->setBusClock(400000);
       display->begin();
       for(int i=0; i<NUM_WORDS; i++) {
         control[i] = new ButtonAndEncoder(TOP_BTN_CCW[i], ENC_BTN_CW[i]);
-        gpio_set_irq_enabled_with_callback(TOP_BTN_CCW[i], GPIO_IRQ_EDGE_FALL, true, &controlCallback);
-        gpio_set_irq_enabled_with_callback(ENC_BTN_CW[i], GPIO_IRQ_EDGE_FALL, true, &controlCallback);
-        voctOut[i] = new AnalogOut(2, 255, VOCT_OFFSET[i]);
-        cvOut[i]   = new AnalogOut(2, 255, CV_OFFSET[i]);
+        gpio_set_irq_enabled_with_callback(TOP_BTN_CCW[i], GPIO_IRQ_EDGE_FALL, true, &controlHandler);
+        gpio_set_irq_enabled_with_callback(ENC_BTN_CW[i], GPIO_IRQ_EDGE_FALL, true, &controlHandler);
+        trigIn[i]   = new GateTrigger(TRIG_IN[i]);
+        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i]);
+        cvOut[i]    = new AnalogOut(CV_OFFSET[i]);
       }
+      this->_audioCallback_ = audioCallback;
+      add_repeating_timer_us(-TIMER_INTERVAL, audioHandler, NULL, &_timer_);
       _tlwhw_ = this;
     }
   }
@@ -183,5 +233,6 @@ public:
   }
 };
 TLWHardware* TLWHardware::_tlwhw_ = NULL;
+void (*TLWHardware::_audioCallback_)(void) = NULL;
 
 #endif

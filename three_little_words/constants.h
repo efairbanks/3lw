@@ -6,7 +6,19 @@
 #define SAMPLE_RATE (1000000.0/TIMER_INTERVAL)
 #define LFO_OUT_PIN 0
 #define OFFSET_OUT_PIN 1
-#define OFFSET_VMAX 6.56
-#define OUTPUT_VMAX 3.28
+
+#define VIN_5V0 5.11
+#define VIN_3V3 3.2
+#define VOCT_R1 1000.0
+#define VOCT_R2 1000.0
+#define CV_R1   4700.0
+#define CV_R2   7500.0
+
+#define VOCT_NOUT_MAX   (VIN_3V3*(VOCT_R2/VOCT_R1))
+#define VOCT_POUT_MAX   (VIN_3V3*((VOCT_R2/VOCT_R1)+1.0))
+#define CV_NOUT_MAX     (VIN_3V3*(CV_R2/CV_R1))
+#define CV_POUT_MAX     (VIN_3V3*((CV_R2/CV_R1)+1.0))
+
+#define CV_IN_2_V(x) ((SIG*3)-VIN_5V0)
 
 #endif
