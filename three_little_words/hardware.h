@@ -160,9 +160,13 @@ class AnalogOut {
 public:
   uint16_t res;
   uint offset;
-  AnalogOut(int offset, int resolution = 255) {
+  double negMax;
+  double posMax;
+  AnalogOut(int offset, int resolution = 255, double nmax = VOCT_NOUT_MAX, double pmax = VOCT_POUT_MAX) {
     this->offset = offset;
     this->res = resolution;
+    this->negMax = nmax;
+    this->posMax = posMax;
     for(uint16_t i=0;i<2;i++) {
       uint slice_num = pwm_gpio_to_slice_num(i + offset);
       pwm_config cfg = pwm_get_default_config();
@@ -177,10 +181,15 @@ public:
     pwm_set_gpio_level(pin, (uint16_t)(level*this->res));
   }
   void SetOutputVoltage(double v) {
-    Set(offset, ((VOCT_NOUT_MAX-v))/VOCT_NOUT_MAX);
+    Set(offset, ((negMax-v))/negMax);
   }
   void SetOffsetVoltage(double v) {
-    Set(offset + 1, (v)/VOCT_POUT_MAX);
+    Set(offset + 1, (v)/posMax);
+  }
+  void SetAudioFP(fp_signed v) {
+    fp_signed offsetCoef = FP_DIV(FP_UNITY, FLOAT2FP(VOCT_NOUT_MAX));
+    pwm_set_gpio_level(offset, FP_MUL(v, (this->res>>1)) + (this->res>>1));
+    pwm_set_gpio_level(offset+1, FP_MUL(offsetCoef, this->res)>>1);
   }
 };
 
@@ -217,8 +226,8 @@ public:
         gpio_set_irq_enabled_with_callback(TOP_BTN_CCW[i], GPIO_IRQ_EDGE_FALL, true, &controlHandler);
         gpio_set_irq_enabled_with_callback(ENC_BTN_CW[i], GPIO_IRQ_EDGE_FALL, true, &controlHandler);
         trigIn[i]   = new GateTrigger(TRIG_IN[i]);
-        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i]);
-        cvOut[i]    = new AnalogOut(CV_OFFSET[i]);
+        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i], 255, VOCT_NOUT_MAX, VOCT_POUT_MAX);
+        cvOut[i]    = new AnalogOut(CV_OFFSET[i], 255, CV_NOUT_MAX, CV_POUT_MAX);
       }
       this->_audioCallback_ = audioCallback;
       add_repeating_timer_us(-TIMER_INTERVAL, audioHandler, NULL, &_timer_);

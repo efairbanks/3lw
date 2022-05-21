@@ -27,13 +27,14 @@ public:
 
 class Info : public App {
 public:
-  double pitch;
+  double pitch[3];
   Info(int x, int y, int width, int height, int len) {
-    pitch = 1.0;
+    for(int i=0;i<3;i++) pitch[i] = 1.0;
   }
   void UpdateDisplay() {
     char buffer[32];
-    pitch += (1.0/12.0) * hw.control[0]->GetDelta();
+
+    for(int i=0;i<3;i++) pitch[i] += (1.0/12.0) * hw.control[i]->GetDelta();
     for(int i=0;i<3;i++) {
       sprintf(buffer, "ENC_%d: v%d p%d h%d",
               i,
@@ -51,8 +52,10 @@ public:
     hw.display->drawStr(0, 8 + 16*3, buffer);
   }
   void Process() {
-    hw.voctOut[0]->SetOutputVoltage(pitch);
-    hw.voctOut[0]->SetOffsetVoltage(VOCT_NOUT_MAX);
+    for(int i=0;i<3;i++) {
+      hw.voctOut[0]->SetOutputVoltage(pitch[i]);
+      hw.voctOut[0]->SetOffsetVoltage(VOCT_NOUT_MAX);
+    }
   }
 };
 
