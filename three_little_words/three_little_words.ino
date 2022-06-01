@@ -17,29 +17,47 @@ typedef enum {
 } InputMode;
 
 InputMode mode = PARAM_MODIFY;
-#define NUM_APPS 3
-App* apps[NUM_APPS];
-int currentApp = 0;
+App* app;
+int appIndex = 0;
 
 void audio_callback() {
-  App* app = apps[currentApp];
   app->Process();
 }
 
 void setup() {
-  apps[0] = new Info(0,0,128,64,16);
+  INIT_FPMATH();
+  app = new Scope();
   hw.Init(audio_callback);
+}
+
+App* getAppByIndex(int index) {
+  switch(index) {
+    case 0:
+      return new Scope();
+    case 1:
+      return new Harnomia();
+    default:
+      return getAppByIndex(index%2);
+  }
 }
 
 void loop() {
   hw.Update();
 
-  hw.display->setFont(u8g_font_6x10);
+  if(hw.control[0]->topButtonPressed()) {
+    hw.SetAudioCallback(NULL);
+    sleep_ms(10);
+    delete app;
+    app = getAppByIndex(++appIndex);
+    hw.SetAudioCallback(audio_callback);
+  }
+
+  hw.display->setFont(u8g2_font_pixzillav1_tf);
   hw.display->setFontRefHeightExtendedText();
   hw.display->setDrawColor(1);
   hw.display->setFontPosTop();
   hw.display->setFontDirection(0);
   hw.display->clearBuffer();
-  apps[currentApp]->UpdateDisplay();
+  app->UpdateDisplay();
   hw.display->sendBuffer();
 }

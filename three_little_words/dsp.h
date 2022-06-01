@@ -77,6 +77,9 @@ public:
   void SetFreq(fp_signed freq) {
     phasor->SetFreq(freq);
   }
+  void SetDuration(uint32_t ms) {
+    phasor->SetDuration(ms);
+  }
   virtual fp_signed Process() = 0;
 };
 

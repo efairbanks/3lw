@@ -153,7 +153,6 @@ public:
         break;
     }
   }
-
 };
 
 class AnalogOut {
@@ -162,11 +161,19 @@ public:
   uint offset;
   double negMax;
   double posMax;
-  AnalogOut(int offset, int resolution = 255, double nmax = VOCT_NOUT_MAX, double pmax = VOCT_POUT_MAX) {
+  lfp_signed negMaxFP;
+  lfp_signed posMaxFP;
+  lfp_signed invNegMaxFP;
+  lfp_signed invPosMaxFP;
+  AnalogOut(int offset, int resolution = 255, double negMax = VOCT_NOUT_MAX, double posMax = VOCT_POUT_MAX) {
     this->offset = offset;
     this->res = resolution;
-    this->negMax = nmax;
+    this->negMax = negMax;
     this->posMax = posMax;
+    this->negMaxFP = FLOAT2LFP(negMax);
+    this->posMaxFP = FLOAT2LFP(posMax);
+    this->invNegMaxFP = FP_DIV(FP_UNITY, FLOAT2LFP(negMax));
+    this->invPosMaxFP = FP_DIV(FP_UNITY, FLOAT2LFP(posMax));
     for(uint16_t i=0;i<2;i++) {
       uint slice_num = pwm_gpio_to_slice_num(i + offset);
       pwm_config cfg = pwm_get_default_config();
@@ -178,7 +185,7 @@ public:
     }
   }
   void Set(uint pin, double level) {
-    pwm_set_gpio_level(pin, (uint16_t)(level*this->res));
+    pwm_set_gpio_level(pin, (uint16_t)(level*res));
   }
   void SetOutputVoltage(double v) {
     Set(offset, ((negMax-v))/negMax);
@@ -188,8 +195,12 @@ public:
   }
   void SetAudioFP(fp_signed v) {
     fp_signed offsetCoef = FP_DIV(FP_UNITY, FLOAT2FP(VOCT_NOUT_MAX));
-    pwm_set_gpio_level(offset, FP_MUL(v, (this->res>>1)) + (this->res>>1));
-    pwm_set_gpio_level(offset+1, FP_MUL(offsetCoef, this->res)>>1);
+    pwm_set_gpio_level(offset, FP_MUL(res, FP_MUL(posMaxFP>>1, invNegMaxFP)));
+    pwm_set_gpio_level(offset+1, (res>>1) + FP_MUL((res>>1), v));
+  }
+  void SetCVFP(lfp_signed v) {
+    pwm_set_gpio_level(offset, res - FP_MUL(res, FP_MUL(v, invNegMaxFP)));
+    pwm_set_gpio_level(offset+1, FP_MUL(res, FP_MUL(invPosMaxFP, negMaxFP)));
   }
 };
 
@@ -202,6 +213,7 @@ public:
   U8G2_SSD1306_128X64_NONAME_F_HW_I2C* display;
   ButtonAndEncoder* control[NUM_WORDS];
   GateTrigger* trigIn[NUM_WORDS];
+  lfp_signed analogIn[NUM_WORDS];
   AnalogOut* voctOut[NUM_WORDS];
   AnalogOut* cvOut[NUM_WORDS];
 
@@ -212,8 +224,32 @@ public:
   }
 
   static bool audioHandler(struct repeating_timer *t) {
+    while(multicore_fifo_rvalid()) {
+      uint32_t val = multicore_fifo_pop_blocking();
+      _tlwhw_->analogIn[val>>24] = val & 0x00FFFFFF;
+    }
     if(_audioCallback_ != NULL) _audioCallback_();
     return true;
+  }
+
+  static void core1Entry() {
+    uint16_t activeAdcChannel = 0;
+    uint32_t channelAccumulators[NUM_WORDS];
+    adc_init();
+    for(int i=0;i<NUM_WORDS;i++) {
+      adc_gpio_init(CV_IN[i]);
+      channelAccumulators[i] = 0;
+    }
+    while(1) {
+      if(multicore_fifo_wready()) {
+        for(int i=0;i<3;i++) {
+          channelAccumulators[activeAdcChannel] = ((adc_read()<<2) + channelAccumulators[activeAdcChannel]*3)>>2;
+        }
+        multicore_fifo_push_blocking(((channelAccumulators[activeAdcChannel])&0x00FFFFFF) | (activeAdcChannel<<24));
+        if(++activeAdcChannel>=NUM_WORDS) activeAdcChannel = 0;
+        adc_select_input(activeAdcChannel);
+      }
+    }
   }
 
   void Init(void (*audioCallback)(void)) {
@@ -226,14 +262,20 @@ public:
         gpio_set_irq_enabled_with_callback(TOP_BTN_CCW[i], GPIO_IRQ_EDGE_FALL, true, &controlHandler);
         gpio_set_irq_enabled_with_callback(ENC_BTN_CW[i], GPIO_IRQ_EDGE_FALL, true, &controlHandler);
         trigIn[i]   = new GateTrigger(TRIG_IN[i]);
-        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i], 255, VOCT_NOUT_MAX, VOCT_POUT_MAX);
+        analogIn[i] = 0;
+        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i], 512, VOCT_NOUT_MAX, VOCT_POUT_MAX);
         cvOut[i]    = new AnalogOut(CV_OFFSET[i], 255, CV_NOUT_MAX, CV_POUT_MAX);
       }
+
+      multicore_launch_core1(core1Entry);
+
       this->_audioCallback_ = audioCallback;
       add_repeating_timer_us(-TIMER_INTERVAL, audioHandler, NULL, &_timer_);
       _tlwhw_ = this;
     }
   }
+
+  void SetAudioCallback(void (*audioCallback)(void)) { _audioCallback_ = audioCallback; }
 
   void Update() {
     for(int i=0; i<NUM_WORDS; i++) {
