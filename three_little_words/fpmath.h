@@ -2,7 +2,7 @@
 #define FPMATH_H
 
 typedef int32_t fp_signed;
-typedef int32_t lfp_signed;
+typedef int64_t lfp_signed;
 #define FP_BITS 14
 #define FP_UNITY (1 << FP_BITS)
 #define FP_MUL(x, y) (((x) * (y)) >> FP_BITS)

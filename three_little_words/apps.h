@@ -2,6 +2,7 @@
 #define APPS_H
 
 #include <Arduino.h>
+#include <vector>
 
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
@@ -14,9 +15,115 @@
 
 TLWHardware hw;
 
+class Parameter {
+private:
+  char* name;
+  int* value;
+  int lastValue;
+  int min;
+  int max;
+public:
+  Parameter() = delete;
+  Parameter(char* paramName, int* val, int minimum = 0, int maximum = 100) {
+    name = paramName;
+    value = val;
+    lastValue = value[0];
+    min = minimum;
+    max = maximum;
+  }
+  void Increase(int val) {
+    val += value[0];
+    if(val>max) val = min;
+    if(val<min) val = max;
+    value[0] = val;
+  }
+  void Set(int val) {
+    if(val>max) val = min;
+    if(val<min) val = max;
+    value[0] = val;
+  }
+  int Get() {
+    return value[0];
+  }
+  char* GetName() {
+    return name;
+  }
+  bool HasChanged() {
+    bool result = lastValue == value[0];
+    lastValue = value[0];
+    return result;
+  }
+};
+
 class App {
 public:
-  App() {}
+  enum ParameterState { Modify, Select };
+  std::vector<Parameter> params;
+  int paramIndices[NUM_WORDS];
+  ParameterState paramStates [NUM_WORDS];
+  App() {
+    for(int i=0;i<NUM_WORDS;i++) {
+      paramIndices[i] = 0;
+      paramStates[i] = Modify;
+    }
+  }
+
+  void AddParam(char* paramName, int* param, int min = 0, int max = 100) {
+    params.push_back(Parameter(paramName, param, min, max));
+  }
+
+  void UpdateParams() {
+    if(params.size() > 0) {
+      for(int i=0;i<NUM_WORDS;i++) {
+        int controlDelta = hw.control[i]->GetDelta();
+        if(hw.control[i]->encButtonPressed()) {
+          paramStates[i] = paramStates[i] == Modify ? Select : Modify;
+        }
+        if(controlDelta != 0) {
+          switch(paramStates[i]) {
+            case Modify:
+              params[paramIndices[i]].Increase(controlDelta);
+              break;
+            case Select:
+              paramIndices[i] += controlDelta;
+              while(paramIndices[i] < 0) paramIndices[i] += params.size();
+              while(paramIndices[i] >= params.size()) paramIndices[i] -= params.size();
+              break;
+            default:
+              paramStates[i] = Modify;
+          }
+        }
+      }
+    }
+  }
+
+  bool ParamsHaveChanged() {
+    bool changed = false;
+    for(int i=0;i<params.size();i++) {
+      changed |= params[i].HasChanged();
+    }
+    return changed;
+  }
+
+  virtual void UpdateInternals() {
+
+  }
+
+  virtual void DrawParams() {
+    if(params.size() > 0) {
+      hw.display->setFont(u8g2_font_threepix_tr);
+      hw.display->drawBox(0,63-5,127,63);
+      hw.display->setDrawColor(0);
+      hw.display->drawVLine(127/3,63-5,6);
+      hw.display->drawVLine(127*2/3,63-5,6);
+      for(int i=0;i<NUM_WORDS;i++) {
+        if(paramStates[i] == Select) hw.display->drawStr(i*128/3 + 2, 63-7, "+");
+        hw.display->drawStr(i*128/3 + 7, 63-6, params[paramIndices[i]].GetName());
+      }
+      hw.display->setDrawColor(1);
+    }
+  }
+
   virtual void NextParam() {}
   virtual void PrevParam() {}
   virtual void DecParam() {}
@@ -82,8 +189,13 @@ public:
   uint bufIndex;
   uint writtenSamples;
   uint phase;
+  int activeChannel;
   fp_signed buf[32];
   Scope() {
+    activeChannel = 0;
+    AddParam("channel", &activeChannel);
+    AddParam("test", &activeChannel);
+    AddParam("another", &activeChannel);
     bufIndex = 0;
     writtenSamples = 0;
     phase = 0;
@@ -115,39 +227,67 @@ public:
   }
 };
 
+class NoteDetector : public App {
+public:
+  fp_signed voltage;
+  OnePoleLP* lp;
+  NoteDetector() {
+    voltage = 0;
+    lp = new OnePoleLP(FLOAT2LFP(0.001));
+  }
+  ~NoteDetector() {
+    delete lp;
+  }
+  void UpdateDisplay() {
+    char buffer[32];
+    sprintf(buffer, "%f", round((FP2FLOAT(voltage)*10.68-5.29)*12));
+    hw.display->drawStr(24, 24, buffer);
+  }
+  void Process() {
+    voltage = lp->Process(hw.analogIn[0]);
+  }
+};
+
 class Harnomia : public App {
 public:
   int edo;
-  fp_signed invEdo;
   int tones;
-  fp_signed freqs[99];
   int harmonic;
   int color;
   int root;
-  bool inverted;
+  int inverted;
+  fp_signed invEdo;
+  fp_signed freqs[99];
   Tri* oscs[NUM_WORDS];
   int xformTriggers[NUM_WORDS];
   char xforms[8] = {'<','>','v','^','-','+','o','?'};
   int numXforms;
   Harnomia() {
-    this->edo       = 12;
-    this->invEdo    = FP_UNITY/this->edo;
-    this->tones     = 3;
-    this->harmonic  = 7;
-    this->color     = 4;
-    this->root      = 0;
-    this->inverted  = false;
-    this->xformTriggers[0] = 0;
-    this->xformTriggers[1] = 3;
-    this->xformTriggers[2] = 6;
+    this->edo       = 12;         AddParam("edo", &edo, 2, 99);
+    this->tones     = 3;          AddParam("tones", &tones, 1, 99);
+    this->harmonic  = 7;          AddParam("harmonic", &harmonic, 1, 99);
+    this->color     = 4;          AddParam("color", &color, 1, 99);
+    this->root      = 0;          AddParam("root", &root, 0, 99);
+    this->inverted  = false;      AddParam("inverted", &inverted, 0, 1);
+    this->xformTriggers[0] = 0;   AddParam("xformI", &xformTriggers[0], 0, 7);
+    this->xformTriggers[1] = 3;   AddParam("xformII", &xformTriggers[1], 0, 7);
+    this->xformTriggers[2] = 6;   AddParam("xformIII", &xformTriggers[2], 0 ,7);
+    // --- //
     this->numXforms = 8;
     for(int i=0;i<NUM_WORDS;i++) {
       oscs[i] = new Tri(1);
     }
+    UpdateInternals();
+  }
+
+  void UpdateInternals() {
+    this->invEdo    = FP_UNITY/this->edo;
     for(int i=0;i<this->edo;i++) {
       freqs[i] = noteToFreq(i);
     }
-    setOscs();
+    for(int i=0;i<NUM_WORDS;i++) {
+      recalculateOutputs(i);
+    }
   }
 
   ~Harnomia() {
@@ -172,62 +312,50 @@ public:
 
   void UpdateDisplay() {
     char buffer[32];
-    int radius = 28;
-
-    for(int i=0;i<NUM_WORDS;i++) {
-      xformTriggers[i] = wrapVal(xformTriggers[i] + hw.control[i]->GetDelta(), numXforms);
-    }
+    int radius = 23;
+    int xoffset = radius+6;
+    int yoffset = radius+3;
 
     sprintf(buffer, "   %d / %d", tones, edo);
     hw.display->drawStr(64, 0, buffer);
 
-    hw.display->drawTriangle(
-      64, 64*1/4,
-      64-5, 64*1/4,
-      64+5, 64*1/4
-    );
-    sprintf(buffer, "    %2d", harmonic);
-    hw.display->drawStr(64, 64*1/4, buffer);
-
-    hw.display->drawDisc(64+24, 64*5/8-1, 64/16);
-    sprintf(buffer, "       %2d", color);
-    hw.display->drawStr(64, 64*2/4, buffer);
-
-    sprintf(buffer, "%d", root);
-    hw.display->drawStr(32-3, 32-6, buffer);
+    sprintf(buffer, "%2d   %2d", color, harmonic);
+    hw.display->drawStr(78, 20, buffer);
+    hw.display->drawDisc(98, 27, 4);
 
     for(int i=0;i<3;i++) {
       sprintf(buffer, "%c", xforms[xformTriggers[i]]);
       hw.display->drawStr(
         64 + i*64/3 + 64/6,
-        64-15,
+        38,
         buffer
       );
     }
 
-    //hw.display->drawCircle(32,32,radius);
-    fp_signed invedo = FP_UNITY/edo;
+    sprintf(buffer, "%d", root);
+    hw.display->drawStr(xoffset-3, yoffset-6, buffer);
+
     for(int i=0;i<edo;i++) {
-      fp_signed xCoef = SIN_LUT[(FP_MUL(SIN_LEN,i*invedo)+(SIN_LEN/4))%1024];
-      fp_signed yCoef = SIN_LUT[FP_MUL(SIN_LEN,i*invedo)];
+      fp_signed xCoef = SIN_LUT[(FP_MUL(SIN_LEN,i*invEdo)+(SIN_LEN/4))%1024];
+      fp_signed yCoef = SIN_LUT[FP_MUL(SIN_LEN,i*invEdo)];
       if(i==root) {
           hw.display->drawDisc(
-          32+FP_MUL(xCoef, radius),
-          32+FP_MUL(yCoef, radius),
+          xoffset+FP_MUL(xCoef, radius),
+          yoffset+FP_MUL(yCoef, radius),
           3
         );
       } else if(i==root || i==(root+getColor())%edo || i==(root+harmonic)%edo) {
         hw.display->drawCircle(
-          32+FP_MUL(xCoef, radius),
-          32+FP_MUL(yCoef, radius),
+          xoffset+FP_MUL(xCoef, radius),
+          yoffset+FP_MUL(yCoef, radius),
           3
         );
       } else {
         hw.display->drawLine(
-          32+FP_MUL(xCoef, radius-2),
-          32+FP_MUL(yCoef, radius-2),
-          32+FP_MUL(xCoef, radius+2),
-          32+FP_MUL(yCoef, radius+2)
+          xoffset+FP_MUL(xCoef, radius-2),
+          yoffset+FP_MUL(yCoef, radius-2),
+          xoffset+FP_MUL(xCoef, radius+2),
+          yoffset+FP_MUL(yCoef, radius+2)
         );
       }
     }
@@ -236,12 +364,12 @@ public:
   void Transform(char xform) {
     switch(xform) {
       case '<':
-        inverted = !inverted;
+        inverted = inverted ? 0 : 1;
         root -= getColor();
         break;
       case '>':
         root += getColor();
-        inverted = !inverted;
+        inverted = inverted ? 0 : 1;
         break;
       case 'v':
         root -= 1;
@@ -270,14 +398,17 @@ public:
     color     = max(wrapVal(color, harmonic), 1);
   }
 
-  void setOutputs() {
+  void recalculateOutputs(int i) {
+    int index = i + FP_MUL(11, hw.analogIn[i]);
+    int octave = index/tones;
+    int tone = (root + getInterval(index - octave*tones));
+    while(tone>=edo) tone-=edo;
+    hw.voctOut[i]->SetCVFP((invEdo*tone)<<octave);
+    oscs[i]->SetFreq((freqs[tone]<<octave)>>3);
+  }
+
+  void processAudioOutputs() {
     for(int i=0;i<3;i++) {
-      int index = i + FP_MUL(11, hw.analogIn[i]);
-      int octave = index/tones;
-      int tone = (root + getInterval(index - octave*tones));
-      while(tone>=edo) tone-=edo;
-      hw.voctOut[i]->SetCVFP((invEdo*tone)<<octave);
-      oscs[i]->SetFreq((freqs[tone]<<octave)>>3);
       hw.cvOut[i]->SetAudioFP(this->oscs[i]->Process());
     }
   }
@@ -285,7 +416,6 @@ public:
   int getInterval(int index) {
     return harmonic*(index>>1) + (index&0x1 ? getColor() : 0);
   }
-
 
   fp_signed getFreq(fp_signed index) {
     int octave = index/tones;
@@ -297,6 +427,7 @@ public:
     return invEdo*(getInterval(index - octave*tones) % edo)<<octave;
   }
 
+  int outputToRecalculate = 0;
   void Process() {
     for(int i=0;i<NUM_WORDS;i++) {
       hw.trigIn[i]->Update();
@@ -304,7 +435,9 @@ public:
         Transform(xforms[this->xformTriggers[i]]);
       }
     }
-    setOutputs();
+    recalculateOutputs(outputToRecalculate);
+    if(++outputToRecalculate > NUM_WORDS-1) outputToRecalculate = 0;
+    processAudioOutputs();
   }
 };
 

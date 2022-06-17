@@ -109,18 +109,19 @@ public:
 
 class OnePoleLP {
 public:
-  fp_signed coef;
-  fp_signed lastVal;
-  OnePoleLP(fp_signed coef) {
+  lfp_signed coef;
+  lfp_signed lastVal;
+  OnePoleLP(lfp_signed coef) {
     this->lastVal = 0;
     this->SetCoef(coef);
   }
-  void SetCoef(fp_signed coef) {
+  void SetCoef(lfp_signed coef) {
     this->coef = coef;
   }
-  fp_signed Process(fp_signed input) {
-    lastVal = FP_MUL(input,coef) + FP_MUL(lastVal, FP_UNITY-coef);
-    return lastVal;
+  fp_signed Process(lfp_signed input) {
+    input = input<<11;
+    lastVal = ((input*1)>>11) + ((lastVal*((1<<11)-1))>>11);
+    return lastVal>>11;
   }
 };
 

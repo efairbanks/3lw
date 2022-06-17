@@ -10,13 +10,6 @@
 #include "apps.h"
 #include "dsp.h"
 
-typedef enum { 
-  PAGE_SELECT,
-  PARAM_SELECT,
-  PARAM_MODIFY
-} InputMode;
-
-InputMode mode = PARAM_MODIFY;
 App* app;
 int appIndex = 0;
 
@@ -24,21 +17,21 @@ void audio_callback() {
   app->Process();
 }
 
-void setup() {
-  INIT_FPMATH();
-  app = new Scope();
-  hw.Init(audio_callback);
-}
-
 App* getAppByIndex(int index) {
   switch(index) {
     case 0:
-      return new Scope();
+      return new NoteDetector();
     case 1:
       return new Harnomia();
     default:
       return getAppByIndex(index%2);
   }
+}
+
+void setup() {
+  INIT_FPMATH();
+  app = getAppByIndex(0);
+  hw.Init(audio_callback);
 }
 
 void loop() {
@@ -58,6 +51,11 @@ void loop() {
   hw.display->setFontPosTop();
   hw.display->setFontDirection(0);
   hw.display->clearBuffer();
+  app->UpdateParams();
+  if(app->ParamsHaveChanged()) {
+    app->UpdateInternals();
+  }
   app->UpdateDisplay();
+  app->DrawParams();
   hw.display->sendBuffer();
 }
