@@ -33,9 +33,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 1.016,
-          "height": 1.8796,
-          "width": 1.8796
+          "drill": 0.0,
+          "height": 3.18,
+          "width": 1.27
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -155,7 +155,8 @@
       "version": 2
     },
     "net_colors": {
-      "Ground": "rgb(0, 255, 255)"
+      "Ground": "rgb(0, 255, 255)",
+      "Power": "rgb(255, 255, 0)"
     }
   },
   "pcbnew": {
