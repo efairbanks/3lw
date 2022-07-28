@@ -1,4 +1,18 @@
-43081647673517
+72932513105272
+Import Library
+2X5-SHROUDED_LOCK
+PLATED THROUGH HOLE - 2X5 SHROUDED HEADER LOCKING FOOTPRINT
+PLATED THROUGH HOLE - 2X5 SHROUDED HEADER LOCKING FOOTPRINT
+0
+10
+10
+Import Library
+200MSP3T1B1M2QEH
+200MSP3T1B1M2QEH-1
+Connector
+0
+3
+3
 Import Library
 CAP_EEE-FT1E220AR
 Aluminum Electrolytic Capacitors - SMD 22uF 25volts 4x5.8mm SMD, https://www.mouser.com/datasheet/2/315/ABA0000C1240-1130326.pdf
@@ -28,12 +42,40 @@ Schottky Diodes & Rectifiers Vr/40V Io/1A T/R, https://www.mouser.com/datasheet/
 2
 2
 Import Library
+ERJ-3RBD1002V
+Res Thick Film 0603 10K Ohm 0.5% 0.1W(1/10W) ±50ppm/°C Molded SMD Automotive Punched T/R, https://www.snapeda.com/parts/ERJ-3RBD1002V/Panasonic/datasheet/
+
+0
+2
+2
+Import Library
+ERJ-U08F1002V
+Panasonic Anti-Sulfurated Resistor 0.25W 1% 10K, package type 3216-2, https://www.snapeda.com/parts/ERJ-U08F1002V/Panasonic/datasheet/
+resistor
+0
+2
+2
+Import Library
 In Resist-ERJ-2RKF1003X
 100 kOhms ±1% 0.1W, 1/10W Chip Resistor 0402 (1005 Metric) Automotive AEC-Q200 Thick Film, https://www.mouser.com/datasheet/2/315/AOA0000C304-1149620.pdf
 
 0
 2
 2
+Import Library
+In-label
+
+
+0
+0
+0
+Import Library
+Inv-label
+
+
+0
+0
+0
 Import Library
 Keystone 633
 
@@ -42,8 +84,22 @@ Keystone 633
 0
 0
 Import Library
+Keystone 633_copy
+
+
+0
+0
+0
+Import Library
 Kingbright-APHHS1005SURCK
 Red 630nm LED Indication - Discrete 1.95V 0402 (1005 Metric), https://www.mouser.com/datasheet/2/216/APHHS1005SURCK-32322.pdf
+
+0
+2
+2
+Import Library
+LED-APD3224SURCK-F01
+Kingbright APD3224SURCK-F01, 3.2X2.4MM RED SMD LED, https://www.kingbrightusa.com/images/catalog/SPEC/APD3224SURCK-F01.pdf
 
 0
 2
@@ -63,6 +119,13 @@ MC74ACT05DG
 14
 14
 Import Library
+MMBT3904215 
+Nexperia Transistor MMBT3904215, Bipolar Transistors - BJT TRANS SW TAPE-7 , https://www.mouser.com/datasheet/2/916/MMBT3904-1365817.pdf 
+
+0
+3
+3
+Import Library
 Mounting Cutout
 
 
@@ -77,12 +140,26 @@ Thick Film Resistors - SMD 0603 1Kohm 0.5% Anti-Surge AEC-Q200, https://www.mous
 2
 2
 Import Library
+Out-label
+
+
+0
+0
+0
+Import Library
 Placeholder
 
 
 0
 0
 0
+Import Library
+RES10k_CRGCQ0402F10K
+TE Fixed Resistor CRGCQ 0402 10K 1%, https://www.snapeda.com/parts/CRGCQ0402F10K/TE%20Connectivity/datasheet/
+
+0
+2
+2
 Import Library
 RESC1608X50N
  CRG0603F300R, 300 Ohms ±1% 0.1W, 1/10W Chip Resistor 0603 (1608 Metric) Thick Film, 1622912-1 TE, https://www.mouser.com/datasheet/2/418/NG_CD_1622912_BA-677566.pdf
@@ -133,7 +210,28 @@ Samtec 2.54mm Dual Row Horizontal Surface Mount Header 5.84mm Post Height, https
 10
 10
 Import Library
+SN74HCS125QBQARQ1
+Buffers & Line Drivers Automotive Schmitt-trigger inputs quadruple bus buffer gates with 3-state outputs 14-WQFN -40 to 125, https://www.ti.com/lit/gpn/sn74hcs125-q1
+Integrated Circuit
+0
+14
+14
+Import Library
 SWITCHCRAFT_35RASMT2AHNTRX
+Phone Connectors 3.5mm SMT MONO T/R 3A CLOSED, https://www.mouser.com/datasheet/2/393/35rasmt2ahntrx_cd-2942934.pdf
+
+0
+3
+3
+Import Library
+SWITCHCRAFT_RASM10
+
+
+0
+3
+3
+Import Library
+SWITCHCRAFT_faceplate_test
 Phone Connectors 3.5mm SMT MONO T/R 3A CLOSED, https://www.mouser.com/datasheet/2/393/35rasmt2ahntrx_cd-2942934.pdf
 
 0
@@ -153,6 +251,13 @@ TE_2-1871935-9
 0
 40
 40
+Import Library
+THONK_PJ398SM-12
+vertical mount 3.5mm switching mono phone jack, https://www.thonk.co.uk/wp-content/uploads/2014/02/Thonkiconn_Jack_Datasheet.pdf
+
+0
+3
+3
 Import Library
 VREG_L7805CDT-TR
 Linear Voltage Regulator IC Positive Fixed 1 Output 1.5A DPAK, https://www.mouser.com/datasheet/2/389/l78-1849632.pdf
@@ -175,9 +280,30 @@ RP2040 XIAO RP2040 series ARM® Cortex®-M0+ MCU 32-Bit Embedded Evaluation Boar
 28
 14
 Import Library
+befaco_Potentiometer_Dual_Vertical_R1214G-B10K_L-15KCM
+Potentiometer, vertical, 9mm, dual, http://www.taiwanalpha.com.tw/downloads?target=products&id=113
+potentiometer vertical 9mm dual
+0
+8
+6
+Import Library
+befaco_Potentiometer_VerticalR1212N-B100K_L15KC-M-NS-B096-NS
+Potentiometer, vertical, 9mm, dual, http://www.taiwanalpha.com.tw/downloads?target=products&id=113
+potentiometer vertical 9mm dual
+0
+5
+3
+Import Library
 board2
 
 
 0
 0
 0
+Import Library
+to_jack
+
+
+0
+3
+3
