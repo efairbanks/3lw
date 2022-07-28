@@ -33,9 +33,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.0,
-          "height": 3.18,
-          "width": 1.27
+          "drill": 0.8,
+          "height": 1.6,
+          "width": 1.6
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -155,8 +155,21 @@
       "version": 2
     },
     "net_colors": {
+      "3.3V": "rgb(255, 255, 0)",
+      "5V": "rgb(255, 255, 0)",
       "Ground": "rgb(0, 255, 255)",
-      "Power": "rgb(255, 255, 0)"
+      "Power": "rgb(255, 255, 0)",
+      "Signal-In": "rgb(0, 255, 0)",
+      "Signal-Out1": "rgb(255, 0, 255)",
+      "Signal-Out2": "rgb(255, 0, 255)",
+      "Signal-Out3": "rgb(255, 0, 255)",
+      "Signal-Out4": "rgb(255, 0, 255)",
+      "Signal-Out5": "rgb(255, 0, 255)",
+      "Signal-Out6": "rgb(255, 0, 255)",
+      "Signal-Out7": "rgb(255, 0, 255)",
+      "Signal-Out8": "rgb(255, 0, 255)",
+      "i2c-SCL": "rgb(255, 153, 0)",
+      "i2c-SDA": "rgb(255, 153, 0)"
     }
   },
   "pcbnew": {
