@@ -34,8 +34,8 @@
         "other_text_upright": false,
         "pads": {
           "drill": 0.0,
-          "height": 1.0,
-          "width": 2.51
+          "height": 1.02,
+          "width": 0.94
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -157,7 +157,6 @@
     "net_colors": {
       "3.3V": "rgb(0, 255, 0)",
       "5V": "rgb(255, 255, 0)",
-      "Bus": "rgb(255, 153, 0)",
       "Ground": "rgb(0, 255, 255)",
       "Pico": "rgb(255, 0, 255)"
     }
