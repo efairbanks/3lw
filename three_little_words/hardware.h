@@ -79,6 +79,8 @@ public:
   uint64_t delayTime;
   bool topButtonHeld;
   bool encButtonHeld;
+  int topButtonHeldFor;
+  int encButtonHeldFor;
   bool topButtonPressed() {
     bool out = _topButtonPressed;
     _topButtonPressed = false;
@@ -95,11 +97,13 @@ public:
     this->encValue = 0;
     this->state = NONE;
     this->nextCanTrigger = time_us_64();
-    this->delayTime = 1000000/40;
+    this->delayTime = 1000000/25;
     this->topButtonHeld = false;
     this->_topButtonPressed = false;
     this->encButtonHeld = false;
     this->_encButtonPressed = false;
+    this->topButtonHeldFor = 0;
+    this->encButtonHeldFor = 0;
     gpio_pull_up(topButtonCCW);
     gpio_pull_up(encButtonCW);
   }
@@ -118,6 +122,8 @@ public:
         _topButtonPressed |= !topButtonHeld && topButtonState;
         _encButtonPressed |= !encButtonHeld && encButtonState;
       }
+      topButtonHeldFor = topButtonHeld && topButtonState ? topButtonHeldFor + 1 : 0;
+      encButtonHeldFor = encButtonHeld && encButtonState ? encButtonHeldFor + 1 : 0;
       topButtonHeld = topButtonState;
       encButtonHeld = encButtonState;
       state = NONE;
@@ -161,19 +167,19 @@ public:
   uint offset;
   double negMax;
   double posMax;
-  lfp_signed negMaxFP;
-  lfp_signed posMaxFP;
-  lfp_signed invNegMaxFP;
-  lfp_signed invPosMaxFP;
+  fp_signed negMaxFP;
+  fp_signed posMaxFP;
+  fp_signed invNegMaxFP;
+  fp_signed invPosMaxFP;
   AnalogOut(int offset, int resolution = 255, double negMax = VOCT_NOUT_MAX, double posMax = VOCT_POUT_MAX) {
     this->offset = offset;
     this->res = resolution;
     this->negMax = negMax;
     this->posMax = posMax;
-    this->negMaxFP = FLOAT2LFP(negMax);
-    this->posMaxFP = FLOAT2LFP(posMax);
-    this->invNegMaxFP = FP_DIV(FP_UNITY, FLOAT2LFP(negMax));
-    this->invPosMaxFP = FP_DIV(FP_UNITY, FLOAT2LFP(posMax));
+    this->negMaxFP = FLOAT2FP(negMax);
+    this->posMaxFP = FLOAT2FP(posMax);
+    this->invNegMaxFP = FP_DIV(FP_UNITY, FLOAT2FP(negMax));
+    this->invPosMaxFP = FP_DIV(FP_UNITY, FLOAT2FP(posMax));
     for(uint16_t i=0;i<2;i++) {
       uint slice_num = pwm_gpio_to_slice_num(i + offset);
       pwm_config cfg = pwm_get_default_config();
@@ -184,21 +190,35 @@ public:
       pwm_set_gpio_level(i + offset, 0);
     }
   }
-  void Set(uint pin, double level) {
-    pwm_set_gpio_level(pin, (uint16_t)(level*res));
+  void Set(double level) {
+    pwm_set_gpio_level(offset, (uint16_t)(level*res));
   }
+  void SetOffset(double level) {
+    pwm_set_gpio_level(offset+1, (uint16_t)(level*res));
+  }
+
+  void SetCycles(int cycles) {
+    pwm_set_gpio_level(offset, (uint16_t)cycles);
+  }
+  void SetCyclesOffset(int cycles) {
+    pwm_set_gpio_level(offset+1, (uint16_t)cycles);
+  }
+
+  /*
   void SetOutputVoltage(double v) {
     Set(offset, ((negMax-v))/negMax);
   }
   void SetOffsetVoltage(double v) {
     Set(offset + 1, (v)/posMax);
   }
+  */
   void SetAudioFP(fp_signed v) {
     fp_signed offsetCoef = FP_DIV(FP_UNITY, FLOAT2FP(VOCT_NOUT_MAX));
     pwm_set_gpio_level(offset, FP_MUL(res, FP_MUL(posMaxFP>>1, invNegMaxFP)));
     pwm_set_gpio_level(offset+1, (res>>1) + FP_MUL((res>>1), v));
   }
-  void SetCVFP(lfp_signed v) {
+  void SetCVFP(fp_signed v) {
+    while(v>negMaxFP) v-= FP_UNITY;
     pwm_set_gpio_level(offset, res - FP_MUL(res, FP_MUL(v, invNegMaxFP)));
     pwm_set_gpio_level(offset+1, FP_MUL(res, FP_MUL(invPosMaxFP, negMaxFP)));
   }
@@ -213,7 +233,7 @@ public:
   U8G2_SSD1306_128X64_NONAME_F_HW_I2C* display;
   ButtonAndEncoder* control[NUM_WORDS];
   GateTrigger* trigIn[NUM_WORDS];
-  lfp_signed analogIn[NUM_WORDS];
+  fp_signed analogIn[NUM_WORDS];
   AnalogOut* voctOut[NUM_WORDS];
   AnalogOut* cvOut[NUM_WORDS];
 
@@ -263,8 +283,8 @@ public:
         gpio_set_irq_enabled_with_callback(ENC_BTN_CW[i], GPIO_IRQ_EDGE_FALL, true, &controlHandler);
         trigIn[i]   = new GateTrigger(TRIG_IN[i]);
         analogIn[i] = 0;
-        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i], 512, VOCT_NOUT_MAX, VOCT_POUT_MAX);
-        cvOut[i]    = new AnalogOut(CV_OFFSET[i], 255, CV_NOUT_MAX, CV_POUT_MAX);
+        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i], 1024, VOCT_NOUT_MAX, VOCT_POUT_MAX);
+        cvOut[i]    = new AnalogOut(CV_OFFSET[i], 1024, CV_NOUT_MAX, CV_POUT_MAX);
       }
 
       multicore_launch_core1(core1Entry);

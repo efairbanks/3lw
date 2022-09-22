@@ -20,23 +20,43 @@ void audio_callback() {
 App* getAppByIndex(int index) {
   switch(index) {
     case 0:
-      return new NoteDetector();
+      return new ThreeLittleWords();
     case 1:
       return new Harnomia();
+    case 2:
+      return new Drums();
+    case 3:
+      return new OutputCalibrator();
     default:
-      return getAppByIndex(index%2);
+      return getAppByIndex(index%4);
   }
 }
 
 void setup() {
+  char buffer[64];
+
+  set_sys_clock_khz(250000, true);
+
   INIT_FPMATH();
   app = getAppByIndex(0);
   hw.Init(audio_callback);
+
+  hw.display->setFont(u8g2_font_pixzillav1_tf);
+  hw.display->setFontRefHeightExtendedText();
+  hw.display->setDrawColor(1);
+  hw.display->setFontPosTop();
+  hw.display->setFontDirection(0);
+  hw.display->clearBuffer();
+  sprintf(buffer, "i love you");
+  hw.display->drawStr(20, 28, buffer);
+  hw.display->sendBuffer();
+  sleep_ms(2000);
 }
 
 void loop() {
   hw.Update();
 
+  /*
   if(hw.control[0]->topButtonPressed()) {
     hw.SetAudioCallback(NULL);
     sleep_ms(10);
@@ -44,6 +64,7 @@ void loop() {
     app = getAppByIndex(++appIndex);
     hw.SetAudioCallback(audio_callback);
   }
+  */
 
   hw.display->setFont(u8g2_font_pixzillav1_tf);
   hw.display->setFontRefHeightExtendedText();

@@ -2,14 +2,13 @@
 #define FPMATH_H
 
 typedef int32_t fp_signed;
-typedef int64_t lfp_signed;
+#define FP_BITWIDTH 32
 #define FP_BITS 14
 #define FP_UNITY (1 << FP_BITS)
 #define FP_MUL(x, y) (((x) * (y)) >> FP_BITS)
 #define FP_DIV(n, d) (((n)<<FP_BITS) / (d))
 #define FP2FLOAT(x) ((x) / ((double)(FP_UNITY)))
 #define FLOAT2FP(x) ((fp_signed)((x) * FP_UNITY))
-#define FLOAT2LFP(x) ((lfp_signed)((x) * FP_UNITY))
 
 #define SIN_LEN 1024
 fp_signed SIN_LUT[SIN_LEN];
@@ -29,19 +28,19 @@ void INIT_TWOEXP_LUT() {
   }
 }
 
-lfp_signed twoexp(lfp_signed x) {
+fp_signed twoexp(fp_signed x) {
   if(x<0) {
     return 0;
   } else if(x==0) {
     return LUT_UNITY;
   } else {
-    lfp_signed whole = x>>FP_BITS;
-    lfp_signed frac = x - (whole<<FP_BITS);
+    fp_signed whole = x>>FP_BITS;
+    fp_signed frac = x - (whole<<FP_BITS);
     return (LUT_UNITY + TWOEXP_LUT[frac>>(FP_BITS-12)]) << whole;
   }
 }
 
-lfp_signed voct2freq(lfp_signed x) {
+fp_signed voct2freq(fp_signed x) {
   return (33 * twoexp(x))>>LUT_BITS;
 }
 

@@ -22,16 +22,19 @@ private:
   int lastValue;
   int min;
   int max;
+  int inc;
 public:
   Parameter() = delete;
-  Parameter(char* paramName, int* val, int minimum = 0, int maximum = 100) {
+  Parameter(char* paramName, int* val, int minimum = 0, int maximum = 100, int incAmount = 1) {
     name = paramName;
     value = val;
     lastValue = value[0];
     min = minimum;
     max = maximum;
+    inc = incAmount;
   }
   void Increase(int val) {
+    val = val * inc;
     val += value[0];
     if(val>max) val = min;
     if(val<min) val = max;
@@ -68,8 +71,8 @@ public:
     }
   }
 
-  void AddParam(char* paramName, int* param, int min = 0, int max = 100) {
-    params.push_back(Parameter(paramName, param, min, max));
+  void AddParam(char* paramName, int* param, int min = 0, int max = 100, int incAmount = 1) {
+    params.push_back(Parameter(paramName, param, min, max, incAmount));
   }
 
   void UpdateParams() {
@@ -147,9 +150,9 @@ public:
 class Arp : public App {
 public:
   int pitches[3];
-  Trigger* trig;
+  Metronome* trig;
   Arp() {
-    trig = new Trigger(150);
+    trig = new Metronome(150);
     for(int i=0;i<3;i++) {
       pitches[i] = 12;
     }
@@ -169,7 +172,7 @@ public:
   int bassSeqLen = 2;
   int leadSeq[14] = {7,12,3,0,3,5,12,7,12,7,5,12,7,12};
   int bassSeq[2] = {0,3};
-  lfp_signed semitone = FP_UNITY/12;
+  fp_signed semitone = FP_UNITY/12;
   void Process() {
     if(trig->Process()) {
       hw.voctOut[0]->SetCVFP(semitone*(leadSeq[leadSeqIndex]+fifths));
@@ -233,7 +236,7 @@ public:
   OnePoleLP* lp;
   NoteDetector() {
     voltage = 0;
-    lp = new OnePoleLP(FLOAT2LFP(0.001));
+    lp = new OnePoleLP(FLOAT2FP(0.001));
   }
   ~NoteDetector() {
     delete lp;
@@ -258,10 +261,14 @@ public:
   int inverted;
   fp_signed invEdo;
   fp_signed freqs[99];
-  Tri* oscs[NUM_WORDS];
+  Saw* oscs[NUM_WORDS];
+  Metronome cvMetro;
   int xformTriggers[NUM_WORDS];
   char xforms[8] = {'<','>','v','^','-','+','o','?'};
   int numXforms;
+  Trigger* analogTriggers[NUM_WORDS];
+  int voiceIndex[NUM_WORDS];
+  int selectedVoice;
   Harnomia() {
     this->edo       = 12;         AddParam("edo", &edo, 2, 99);
     this->tones     = 3;          AddParam("tones", &tones, 1, 99);
@@ -273,15 +280,19 @@ public:
     this->xformTriggers[1] = 3;   AddParam("xformII", &xformTriggers[1], 0, 7);
     this->xformTriggers[2] = 6;   AddParam("xformIII", &xformTriggers[2], 0 ,7);
     // --- //
+    this->selectedVoice = 0;
     this->numXforms = 8;
     for(int i=0;i<NUM_WORDS;i++) {
-      oscs[i] = new Tri(1);
+      oscs[i] = new Saw(1);
+      analogTriggers[i] = new Trigger((FP_UNITY*3)/5);
+      voiceIndex[i] = 0;
     }
+    cvMetro.SetFreq(1000);
     UpdateInternals();
   }
 
   void UpdateInternals() {
-    this->invEdo    = FP_UNITY/this->edo;
+    this->invEdo = FP_UNITY/this->edo;
     for(int i=0;i<this->edo;i++) {
       freqs[i] = noteToFreq(i);
     }
@@ -399,12 +410,12 @@ public:
   }
 
   void recalculateOutputs(int i) {
-    int index = i + FP_MUL(11, hw.analogIn[i]);
+    int index = i + voiceIndex[i];
     int octave = index/tones;
     int tone = (root + getInterval(index - octave*tones));
     while(tone>=edo) tone-=edo;
-    hw.voctOut[i]->SetCVFP((invEdo*tone)<<octave);
-    oscs[i]->SetFreq((freqs[tone]<<octave)>>3);
+    hw.voctOut[i]->SetCVFP(invEdo*tone+octave*FP_UNITY);
+    oscs[i]->SetFreq((freqs[tone]<<octave)>>(i+2));
   }
 
   void processAudioOutputs() {
@@ -434,12 +445,807 @@ public:
       if(hw.trigIn[i]->RisingEdge()) {
         Transform(xforms[this->xformTriggers[i]]);
       }
+      if(analogTriggers[i]->Process(hw.analogIn[i])) {
+        switch(i) {
+          case 0:
+            if(++selectedVoice>=NUM_WORDS) selectedVoice = 0;
+            break;
+          case 1:
+            if(++voiceIndex[selectedVoice]>tones) voiceIndex[selectedVoice] = 0;
+            break;
+          case 2:
+            if(--voiceIndex[selectedVoice]<0) voiceIndex[selectedVoice] = tones;
+            break;
+        }
+      }
     }
-    recalculateOutputs(outputToRecalculate);
-    if(++outputToRecalculate > NUM_WORDS-1) outputToRecalculate = 0;
+    if(cvMetro.Process()) {
+      recalculateOutputs(outputToRecalculate);
+      if(++outputToRecalculate > NUM_WORDS-1) outputToRecalculate = 0;
+    }
     processAudioOutputs();
   }
 };
+
+class LFO : public App {
+public:
+  Tri* oscs[3];
+  int rate;
+  int coef;
+  int maxRate;
+  int maxCoef;
+  LFO() {
+    for(int i=0;i<3;i++) oscs[i] = new Tri(1);
+    rate = 30;  AddParam("rate", &rate, 0, 127);
+    coef = 30;  AddParam("coef", &coef, 0, 127);
+    maxRate = FP_UNITY*5;
+    maxCoef = FP_UNITY*5;
+  }
+  ~LFO() {
+    for(int i=0;i<3;i++) delete oscs[i];
+  }
+  void UpdateInternals() {
+    int delta = FP_MUL(SAMPLEDELTA, (maxRate*rate)>>7);
+    for(int i=0;i<3;i++) {
+      oscs[i]->phasor->delta = delta;
+      delta = FP_MUL(delta, (maxCoef*coef)>>7);
+    }
+  }
+  void UpdateDisplay() {
+    char buffer[128];
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    sprintf(buffer, " %1.3f * ( %1.3f ^ N )", FP2FLOAT((maxRate*rate)>>7), FP2FLOAT((maxCoef*coef)>>7));
+    hw.display->drawStr(0, 0, buffer);
+  }
+  void Process() {
+    for(int i=0;i<3;i++) {
+      hw.cvOut[i]->SetAudioFP(this->oscs[i]->Process());
+    }
+  }
+};
+
+class InputCalibrator : public App {
+public:
+  int samplesToAverage;
+  double offsets[3];
+  double coefs[3];
+  double zeroVals[3];
+  double neg3Vals[3];
+  bool initialized;
+  InputCalibrator() {
+    samplesToAverage = 1000;
+    initialized = false;
+  }
+  ~InputCalibrator() {}
+  void UpdateInternals() {
+
+  }
+  void UpdateDisplay() {
+    char buffer[64];
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+
+    if(!initialized) {
+      for(int i=0;i<NUM_WORDS;i++) {
+        // record value of 0v signal
+        hw.voctOut[i]->Set(0.0);
+        hw.cvOut[i]->SetOffset(0.0);
+        zeroVals[i] = 0.0;
+        for(int j=0;j<samplesToAverage;j++) {
+          sleep_ms(1);
+          zeroVals[i] = zeroVals[i] + FP2FLOAT(hw.analogIn[i])/((double)samplesToAverage);
+        }
+        // record value of -3.3v signal
+        hw.voctOut[i]->Set(1.0);
+        hw.cvOut[i]->SetOffset(0.0);
+        neg3Vals[i] = 0.0;
+        for(int j=0;j<samplesToAverage;j++) {
+          sleep_ms(1);
+          neg3Vals[i] = neg3Vals[i] + FP2FLOAT(hw.analogIn[i])/((double)samplesToAverage);
+        }
+      }
+      initialized = true;
+    }
+
+    for(int i=0;i<NUM_WORDS;i++) {
+      sprintf(buffer, "%1.4f", FP2FLOAT(hw.analogIn[i]));
+      hw.display->drawStr((128*i)/3, 0, buffer);
+      sprintf(buffer, "%1.4f", neg3Vals[i]);
+      hw.display->drawStr((128*i)/3, 16, buffer);
+      sprintf(buffer, "%1.4f", zeroVals[i]);
+      hw.display->drawStr((128*i)/3, 32, buffer);
+      double avgVal = 0.0;
+      for(int j=0;j<samplesToAverage;j++) {
+        sleep_ms(1);
+        avgVal = (FP2FLOAT(hw.analogIn[i])-zeroVals[i])*(VIN_3V3/abs(zeroVals[i]-neg3Vals[i]));
+      }
+      sprintf(buffer, "%1.4f", avgVal);
+      hw.display->drawStr((128*i)/3, 48, buffer);
+    }
+  }
+};
+
+class MathTest : public App {
+  void UpdateDisplay() {
+    char buffer[64];
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    fp_signed a, b;
+
+    a = FLOAT2FP(1.35);
+    b = FLOAT2FP(8.65);
+    sprintf(
+      buffer,
+      "%2.2f + %2.2f = %2.2f",
+      FP2FLOAT(a),
+      FP2FLOAT(b),
+      FP2FLOAT(a+b)
+    );
+    hw.display->drawStr(0, 0, buffer);
+
+    a = FLOAT2FP(3.333333);
+    b = FLOAT2FP(3);
+    sprintf(
+      buffer,
+      "%2.2f * %2.2f = %2.2f",
+      FP2FLOAT(a),
+      FP2FLOAT(b),
+      FP2FLOAT(FP_MUL(a,b))
+    );
+    hw.display->drawStr(0, 16, buffer);
+  }
+};
+
+class OutputCalibrator : public App {
+public:
+  int voctNegVoltage = 0;
+  int voctPosVoltage = 1;
+  int cvNegVoltage = 0;
+  int cvPosVoltage = 1;
+
+  fp_t<int,14> voctOffset = 0.0;
+  fp_t<int,14> voctNegCoef = 1.0/VOCT_NOUT_MAX;
+  fp_t<int,14> voctPosCoef = 1.0/VOCT_POUT_MAX;
+  fp_t<int,14> cvOffset = 0.0;
+  fp_t<int,14> cvNegCoef = 1.0/CV_NOUT_MAX;
+  fp_t<int,14> cvPosCoef = 1.0/CV_POUT_MAX;
+  
+  OutputCalibrator() {
+    AddParam("octNV", &voctNegVoltage, 0, 10);
+    AddParam("octPV", &voctPosVoltage, 0, 10);
+    AddParam("cvNV", &cvNegVoltage, 0, 10);
+    AddParam("cvPV", &cvPosVoltage, 0, 10);
+
+    AddParam("vo", (int*)&voctOffset, 0, 1<<14, (1<<14)/100);
+    AddParam("vNc", (int*)&voctNegCoef, 0, 1<<14, (1<<14)/100);
+    AddParam("vPc", (int*)&voctPosCoef, 0, 1<<14, (1<<14)/100);
+
+    AddParam("co", (int*)&cvOffset, 0, 1<<14, (1<<14)/100);
+    AddParam("cNc", (int*)&cvNegCoef, 0, 1<<14, (1<<14)/100);
+    AddParam("cPc", (int*)&cvPosCoef, 0, 1<<14, (1<<14)/100);
+    
+  }
+  void UpdateDisplay() {
+    char buffer[64];
+    hw.display->setFont(u8g2_font_threepix_tr);
+    for(int i=0;i<min((64/6),params.size());i++) {
+      sprintf(buffer, "%s %d", params[i].GetName(), params[i].Get());
+      hw.display->drawStr(0, i*6, buffer);
+    }
+    //sprintf(buffer, "%s %d", "voctOutCycles", int(fp_t<int,0>(voctNegVoltage*hw.voctOut[0]->res)*voctNegCoef));
+    //hw.display->drawStr(0,48, buffer);
+  }
+  void Process() {
+    for(int i=0;i<NUM_WORDS;i++) {
+      hw.voctOut[i]->SetCycles(int(fp_t<int,0>(voctNegVoltage*hw.voctOut[i]->res)*voctNegCoef));
+
+      // - this works!! - //
+      fp_t<int64_t,14> temp = (fp_t<int64_t,14>(voctPosVoltage)+voctOffset)*voctPosCoef;
+      temp = temp*fp_t<int64_t,14>(hw.voctOut[i]->res);
+      hw.voctOut[i]->SetCyclesOffset(int(temp));
+      // ---- //
+
+      hw.cvOut[i]->SetCycles(int(fp_t<int,0>(cvNegVoltage*hw.cvOut[i]->res)*cvNegCoef));
+      hw.cvOut[i]->SetCyclesOffset(int(fp_t<int,0>(cvPosVoltage*hw.cvOut[i]->res)*cvPosCoef));
+    }
+
+  }
+};
+
+class Drums : public App {
+public:
+  Kick kick;
+  Snare snare;
+  HighHat hat;
+  bool lastVals[NUM_WORDS];
+  Drums() {
+    for(int i=0;i<NUM_WORDS;i++) lastVals[i] = false;
+  }
+  void UpdateDisplay() {
+    char buffer[64];
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    sprintf(buffer, "%d  %d  %d", lastVals[0], lastVals[1], lastVals[2]);
+    hw.display->drawStr(0, 0, buffer);
+  }
+  void Process() {
+    for(int i=0;i<NUM_WORDS;i++) {
+      bool curVal = hw.analogIn[i]>(FP_UNITY>>1)+(FP_UNITY/5);
+      hw.trigIn[i]->Update();
+      if(hw.trigIn[i]->RisingEdge()) {
+        switch(i) {
+          case 0:
+            kick.env->Reset();
+            break;
+          case 1:
+            snare.env->Reset();
+            break;
+          case 2:
+            hat.env->Reset();
+            break;
+        }
+      }
+      lastVals[i] = curVal;
+    }
+    hw.cvOut[0]->SetAudioFP(kick.Process());
+    hw.cvOut[1]->SetAudioFP(snare.Process());
+    hw.cvOut[2]->SetAudioFP(hat.Process());
+  }
+};
+
+class MiniMaths : public App {
+public:
+  typedef fp_t<int64_t,22> hpreal_t;
+  typedef fp_t<int32_t,22> real_t;
+  typedef fp_t<int32_t,FP_BITS> out_t;
+  class ADEnv {
+    public:
+      real_t attackDelta;
+      real_t decayDelta;
+      real_t attackPhase;
+      real_t decayPhase;
+      real_t deltaScale;
+      real_t CalculateDelta(double seconds) {
+        return real_t(1.0/(SAMPLE_RATE*seconds));
+      }
+      ADEnv(double attack, double decay) {
+        attackDelta = CalculateDelta(attack);
+        decayDelta = CalculateDelta(decay);
+        attackPhase = real_t(1);
+        decayPhase = real_t(1);
+        deltaScale = real_t(1);
+      }
+      void Reset() {
+        decayPhase = real_t(0);
+        attackPhase = real_t(0);
+      }
+      bool IsComplete() {
+        return (decayPhase > real_t(1)) && (attackPhase > real_t(1));
+      }
+      out_t Process() {
+        out_t out = out_t(0);
+        if(attackPhase <= real_t(1)) {
+          out = out_t(attackPhase);
+          auto scaledDelta = real_t(attackDelta) * fp_t<int32_t,8>(deltaScale);
+          attackPhase += real_t(scaledDelta);
+        } else if (decayPhase <= real_t(1)) {
+          out = out_t(1) - out_t(decayPhase);
+          auto scaledDelta = real_t(decayDelta) * fp_t<int32_t,8>(deltaScale);
+          decayPhase += real_t(scaledDelta);
+        }
+        return out;
+      }
+  };
+  ADEnv* adEnvs[NUM_WORDS];
+  ADEnv* clockEnvs[NUM_WORDS];
+  bool clockTriggered[3];
+  MiniMaths() {
+    for(int i=0;i<NUM_WORDS;i++) {
+      adEnvs[i] = new ADEnv(0.01, 0.01);
+      clockEnvs[i] = new ADEnv(0.001, 0.001);
+      clockTriggered[i] = true;
+    }
+    int oneHz = (1<<22)/SAMPLERATE;
+    AddParam("ATK 1", (int*)&adEnvs[0]->attackDelta,  oneHz, oneHz*2000, oneHz);
+    AddParam("ATK 2", (int*)&adEnvs[1]->attackDelta,  oneHz, oneHz*2000, oneHz);
+    AddParam("ATK 3", (int*)&adEnvs[2]->attackDelta,  oneHz, oneHz*2000, oneHz);
+    AddParam("DCY 1", (int*)&adEnvs[0]->decayDelta,   oneHz, oneHz*2000, oneHz);
+    AddParam("DCY 2", (int*)&adEnvs[1]->decayDelta,   oneHz, oneHz*2000, oneHz);
+    AddParam("DCY 3", (int*)&adEnvs[2]->decayDelta,   oneHz, oneHz*2000, oneHz);
+    paramIndices[0] = 3;
+    paramIndices[1] = 4;
+    paramIndices[2] = 5;
+  }
+  ~MiniMaths() {
+    for(int i=0;i<NUM_WORDS;i++) {
+      delete adEnvs[i];
+      delete clockEnvs[i];
+    }
+  }
+  void UpdateDisplay() {
+    char buffer[64];
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    for(int i=0;i<3;i++) {
+      sprintf(buffer, "%1.2f %1.5f %1.5f",
+        float(adEnvs[i]->deltaScale),
+        float(adEnvs[i]->attackDelta),
+        float(adEnvs[i]->decayDelta));
+      hw.display->drawStr(0, i*16, buffer);
+    }
+  }
+  void Process() {
+    for(int i=0;i<NUM_WORDS;i++) {
+      hw.trigIn[i]->Update();
+      auto ain = fp_t<int32_t,14>(hw.analogIn[i])>>13;
+      ain = ain * ain;
+      adEnvs[i]->deltaScale = real_t(ain);
+      if(hw.trigIn[i]->RisingEdge() || hw.control[i]->encButtonHeld) {
+        adEnvs[i]->Reset();
+        clockTriggered[i] = false;
+      }
+      if(adEnvs[i]->IsComplete() && (clockTriggered[i] == false)) {
+        clockEnvs[i]->Reset();
+        clockTriggered[i] = true;
+      }
+      hw.cvOut[i]->SetAudioFP((fp_signed)(adEnvs[i]->Process()*fp_t<int,0>(FP_UNITY)));
+      hw.voctOut[i]->SetAudioFP(clockEnvs[i]->Process() > real_t(0) ? FP_UNITY : 0);
+     }
+  }
+};
+
+class ADEnv {
+public:
+  typedef fp_t<int32_t, 20> phase_t;
+  typedef fp_t<int32_t, 0> param_t;
+  typedef fp_t<int32_t, 14> audio_t;
+  typedef enum { RISING, FALLING, WAITING } state_t;
+  phase_t phase;
+  phase_t deltaConst;
+  param_t attackSpeed;
+  param_t decaySpeed;
+  state_t state;
+  ADEnv() {
+    phase = phase_t(0);
+    deltaConst = phase_t(0.2/SAMPLE_RATE);
+    attackSpeed = param_t(10);
+    decaySpeed = param_t(6);
+    state = WAITING;
+  }
+  void Trigger() {
+    state = RISING;
+    phase = 0;
+  }
+  void SetAttackSpeed(int speed) { attackSpeed = param_t(speed); }
+  void SetDecaySpeed(int speed) { decaySpeed = param_t(speed); }
+  audio_t Process() {
+    audio_t out = audio_t(0);
+    switch(state) {
+      case RISING:
+        out = audio_t(phase);
+        phase += deltaConst * attackSpeed;
+        if(phase > phase_t(1)) {
+          phase = 0;
+          state = FALLING;
+        }
+        break;
+      case FALLING:
+        out = audio_t(1) - audio_t(phase);
+        phase += deltaConst * decaySpeed;
+        if(phase > phase_t(1)) {
+          phase = 0;
+          state = WAITING;
+        }
+        break;
+      case WAITING:
+        break;
+    }
+    return out;
+  }
+};
+
+class LittleApp : public App {
+private:
+  LittleApp() {}
+public:
+  int wordIndex;
+  LittleApp(int i) {
+    wordIndex = i;
+  }
+};
+
+class LittleEnv : public LittleApp {
+public:
+  typedef enum { PARAM_ATTACK, PARAM_DECAY, PARAM_LAST } SelectedParam;
+  SelectedParam selectedParam;
+  ADEnv env;
+  int attackSpeed;
+  int decaySpeed;
+  LittleEnv(int wordIndex) : LittleApp(wordIndex) {
+    this->selectedParam = PARAM_ATTACK;
+    this->attackSpeed = 10;
+    this->decaySpeed = 4;
+  }
+  void UpdateDisplay() {
+    // handle controls
+    if(hw.control[wordIndex]->encButtonPressed()) selectedParam = (SelectedParam)(((int)selectedParam + 1) % PARAM_LAST);
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0) {
+      switch(selectedParam) {
+        case PARAM_ATTACK:
+          attackSpeed += encDelta;
+          break;
+        case PARAM_DECAY:
+          decaySpeed += encDelta;
+          break;
+      }
+    }
+
+    // draw UI
+    char buffer[64];
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/3 - 1;
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    sprintf(buffer, "A: %d %s", this->attackSpeed, selectedParam == PARAM_ATTACK ? "*" : "");
+    hw.display->drawStr(appOffset+2, 0, buffer);
+    sprintf(buffer, "D: %d %s", this->decaySpeed, selectedParam == PARAM_DECAY ? "*" : "");
+    hw.display->drawStr(appOffset+2, 15, buffer);
+  }
+  void Process() {
+    hw.trigIn[wordIndex]->Update();
+    if(hw.trigIn[wordIndex]->RisingEdge()) env.Trigger();
+    env.SetAttackSpeed(attackSpeed*attackSpeed);
+    env.SetDecaySpeed(decaySpeed*decaySpeed);
+    hw.voctOut[wordIndex]->SetCycles(0);
+    hw.voctOut[wordIndex]->SetCyclesOffset(hw.cvOut[wordIndex]->res - ((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * env.Process())));
+    hw.cvOut[wordIndex]->SetCycles(0);
+    hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * env.Process()));
+  }
+};
+
+class LittleSeq : public LittleApp {  
+public:
+  typedef enum { PARAM_WRITEINDEX, PARAM_VALUE, PARAM_GATE, PARAM_LENGTH, PARAM_LAST } SelectedParam;
+  SelectedParam selectedParam;
+  typedef fp_t<int32_t, 20> phase_t;
+  typedef fp_t<int32_t, 0> param_t;
+  typedef fp_t<int32_t, 14> audio_t;
+  audio_t steps[32];
+  bool gates[32];
+  int len;
+  int readIndex;
+  int writeIndex;
+  int clockPulseLength;
+  int blinkTime;
+  char editMode;
+  LittleSeq(int wordIndex) : LittleApp(wordIndex) {
+    len = 8;
+    readIndex = 0;
+    writeIndex = 0;
+    clockPulseLength = 0;
+    blinkTime = 0;
+    selectedParam = PARAM_LENGTH;
+    editMode = 'L';
+    for(int i=0;i<32;i++) {
+      steps[i] = audio_t(rand()%11 + 1) * audio_t(1.0/12.0);
+      gates[i] = i == 0 ? true : false;
+    }
+  }
+  void UpdateDisplay() {
+    // handle controls
+    bool encPressed = hw.control[wordIndex]->encButtonPressed();
+    if(encPressed) selectedParam = (SelectedParam)(((int)selectedParam + 1) % PARAM_LAST);
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0 || encPressed) {
+      switch(selectedParam) {
+        case PARAM_WRITEINDEX:
+          editMode = 'I';
+          writeIndex += encDelta;
+          if(writeIndex >= len) writeIndex -= len;
+          if(writeIndex < 0) writeIndex += len;
+          break;
+        case PARAM_VALUE:
+          editMode = 'V';
+          steps[writeIndex] += audio_t(1.0/(20.0))*fp_t<int32_t, 0>(encDelta);
+          if(steps[writeIndex] > audio_t(1.0)) steps[writeIndex] = audio_t(1.0);
+          if(steps[writeIndex] < audio_t(0.0)) steps[writeIndex] = audio_t(0.0);
+          break;
+        case PARAM_GATE:
+          editMode = 'G';
+          if(encDelta != 0) gates[writeIndex] = gates[writeIndex] ? 0 : 1;
+          break;
+        case PARAM_LENGTH:
+          editMode = 'L';
+          len += encDelta;
+          len = max(1, min(32, len));
+          break;
+      }
+    }
+
+    // draw ui
+    char buffer[64];
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/3 - 1;
+    int barHeight = hw.display->getDisplayHeight()/len - 1;
+    blinkTime = (blinkTime+1) & 0xf;
+    for(int i=0;i<len;i++) {
+      if(i==readIndex || (i==writeIndex && blinkTime < 8)) {
+        hw.display->drawVLine(
+          appOffset,
+          (i*hw.display->getDisplayHeight())/len,
+          barHeight
+        );
+      }
+      if(gates[i]) {
+        hw.display->drawBox(
+          appOffset + 2,
+          (i*hw.display->getDisplayHeight())/len,
+          min(max(0, int(fp_t<int32_t, 0>(appWidth-3) * steps[i])), appWidth),
+          barHeight
+        );
+      } else {
+        hw.display->drawFrame(
+          appOffset + 2,
+          (i*hw.display->getDisplayHeight())/len,
+          min(max(0, int(fp_t<int32_t, 0>(appWidth-3) * steps[i])), appWidth),
+          barHeight
+        );
+      }
+    }
+    sprintf(buffer, "%c", editMode);
+    hw.display->setDrawColor(2);
+    hw.display->setFontMode(true);
+    hw.display->drawStr(appOffset + appWidth - 10, hw.display->getDisplayHeight() - 15, buffer);
+    hw.display->setDrawColor(1);
+  }
+  void Process() {
+    hw.trigIn[wordIndex]->Update();
+    if(hw.trigIn[wordIndex]->RisingEdge()) {
+      readIndex = readIndex + 1;
+      if(readIndex >= len) {
+        readIndex = 0;
+      }
+      if(gates[readIndex]) clockPulseLength = SAMPLERATE>>10;
+    }
+    hw.voctOut[wordIndex]->SetCycles(0);
+    hw.voctOut[wordIndex]->SetCyclesOffset(clockPulseLength-- > 0 && clockPulseLength < SAMPLERATE>>11 ? hw.voctOut[wordIndex]->res : 0);
+    hw.cvOut[wordIndex]->SetCycles(0);
+    hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * steps[readIndex]));
+  }
+};
+
+class LittleCount : public LittleApp {
+public:
+  typedef enum { PARAM_DIVS, PARAM_STEP, PARAM_MAX, PARAM_MIN, PARAM_LAST } SelectedParam;
+  SelectedParam selectedParam;
+  int divs;
+  int step;
+  int stepSize;
+  fp_t<int32_t, 10> maxVal;
+  fp_t<int32_t, 10> minVal;
+  LittleCount(int wordIndex) : LittleApp(wordIndex) {
+    divs = 5;
+    step = 0;
+    stepSize = 1;
+    maxVal = fp_t<int32_t, 10>(5);
+    minVal = fp_t<int32_t, 10>(-5);
+  }
+  void UpdateDisplay() {
+    // handle controls
+    if(hw.control[wordIndex]->encButtonPressed()) selectedParam = (SelectedParam)(((int)selectedParam + 1) % PARAM_LAST);
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0) {
+      switch(selectedParam) {
+        case PARAM_DIVS:
+          divs = max(2,min(100, divs + encDelta));
+          break;
+        case PARAM_STEP:
+          stepSize = max(1,min(divs-1, stepSize + encDelta));
+          break;
+        case PARAM_MAX:
+          maxVal += fp_t<int32_t, 10>(0.25) * fp_t<int32_t, 0>(encDelta);
+          if(maxVal > fp_t<int32_t, 10>(5.0)) maxVal = fp_t<int32_t, 10>(5.0);
+          if(maxVal < fp_t<int32_t, 10>(-5.0)) maxVal = fp_t<int32_t, 10>(-5.0);
+          break;
+        case PARAM_MIN:
+          minVal += fp_t<int32_t, 10>(0.25) * fp_t<int32_t, 0>(encDelta);
+          if(minVal > fp_t<int32_t, 10>(5.0)) minVal = fp_t<int32_t, 10>(5.0);
+          if(minVal < fp_t<int32_t, 10>(-5.0)) minVal = fp_t<int32_t, 10>(-5.0);
+          break;
+      }
+    }
+
+    // draw UI
+    char buffer[64];
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/3 - 1;
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    sprintf(buffer, "% 1.2f", float(maxVal));
+    hw.display->drawStr(appOffset+16, 0, buffer);
+    sprintf(buffer, "%2dU", stepSize);
+    hw.display->drawStr(appOffset+17, 27, buffer);
+    sprintf(buffer, "% 1.2f", float(minVal));
+    hw.display->drawStr(appOffset+15, 54, buffer);
+    hw.display->drawVLine(appOffset+7, 2, hw.display->getDisplayHeight() - 4);
+    for(int i=0; i<divs; i++) {
+      int y = 2 + ((divs-1-i)*(hw.display->getDisplayHeight()-4))/(divs-1);
+      hw.display->drawHLine(appOffset+3, y, 11);
+      if(i==step) hw.display->drawCircle(appOffset+7, y, 3);
+    }
+  }
+  void Process() {
+    hw.trigIn[wordIndex]->Update();
+    if(hw.trigIn[wordIndex]->RisingEdge()) {
+      step = (step + stepSize) % divs;
+      fp_t<int32_t, 10> val = fp_t<int32_t, 10>( ((maxVal - minVal) * fp_t<int32_t, 0>(step)) / fp_t<int32_t, 0>(divs-1) );
+      val = fp_t<int32_t, 10>((val + minVal) * fp_t<int32_t, 10>(0.2));
+      hw.cvOut[wordIndex]->SetAudioFP((fp_signed)(val*fp_t<int,0>(FP_UNITY)));
+    }
+  }
+};
+
+class LittleQuant : public LittleApp {
+public:
+  typedef fp_t<int32_t, 20> phase_t;
+  typedef fp_t<int32_t, 14> audio_t;
+  typedef fp_t<int32_t, 8> voct_t;
+  std::vector<int> scale;
+  int degree;
+  int octave;
+  int divs;
+  int lastDegree;
+  int lastOctave;
+  int hitCount;
+  voct_t dist;
+  LittleQuant(int wordIndex) : LittleApp(wordIndex) {
+    scale.push_back(0);
+    scale.push_back(2);
+    scale.push_back(3);
+    scale.push_back(5);
+    scale.push_back(7);
+    scale.push_back(8);
+    scale.push_back(11);
+    degree = 0;
+    octave = 4;
+    divs = 14;
+    lastDegree = degree;
+    lastOctave = octave;
+    hitCount = 0;
+  }
+  void UpdateDisplay() {
+    char buffer[64];
+
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0) {
+      divs += encDelta;
+      divs = max(1, min(100, divs));
+    }
+
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/3 - 1;
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    sprintf(buffer, "D: %d", degree);
+    hw.display->drawStr(appOffset+2, 0, buffer);
+    sprintf(buffer, "O: %d", octave);
+    hw.display->drawStr(appOffset+2, 16, buffer);
+    sprintf(buffer, "/: %d", divs);
+    hw.display->drawStr(appOffset+2, 32, buffer);
+  }
+  void Process() {
+    hw.trigIn[wordIndex]->Update();
+
+    voct_t frac = voct_t(hw.analogIn[wordIndex]*divs)>>14;
+    int rounded = int(frac + voct_t(0.5));
+    dist = frac - voct_t(rounded);
+    if(dist < voct_t(0)) dist = -dist;
+
+    if(hw.trigIn[wordIndex]->RisingEdge()) {
+      int oct = 0;
+      int deg = rounded;
+      while(deg >= 7) {
+        deg -= 7;
+        oct++;
+      }
+
+      octave = oct;
+      degree = deg;
+
+      lastOctave = oct;
+      lastDegree = deg;
+    }
+
+    audio_t out = audio_t(audio_t(scale[degree]) * audio_t(1.0/12.0));
+    out = out + audio_t(max(octave-1, 0));
+
+    hw.voctOut[wordIndex]->SetCVFP((fp_signed)(out*fp_t<int,0>(FP_UNITY)));
+  }
+};
+
+class LittleDrum : public LittleApp {
+public:
+  Kick kick;
+  typedef enum { PARAM_NULL, PARAM_LAST } SelectedParam;
+  SelectedParam selectedParam;
+  ADEnv env;
+  LittleDrum(int wordIndex) : LittleApp(wordIndex) {
+    this->selectedParam = PARAM_NULL;
+  }
+  void UpdateDisplay() {
+    // handle controls
+    if(hw.control[wordIndex]->encButtonPressed()) selectedParam = (SelectedParam)(((int)selectedParam + 1) % PARAM_LAST);
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0) {
+      switch(selectedParam) {
+        case PARAM_NULL:
+          break;
+      }
+    }
+
+    // draw UI
+    char buffer[64];
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/3 - 1;
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    sprintf(buffer, "KICK");
+    hw.display->drawStr(appOffset+2, 0, buffer);
+    sprintf(buffer, "L:%d", 40 + (hw.analogIn[wordIndex] >> (FP_BITS - 6)));
+    hw.display->drawStr(appOffset+2, 15, buffer);
+    sprintf(buffer, "H:%d", 150 + (hw.analogIn[wordIndex] >> (FP_BITS - 9)));
+    hw.display->drawStr(appOffset+2, 30, buffer);
+  }
+  void Process() {
+    hw.trigIn[wordIndex]->Update();
+    if(hw.trigIn[wordIndex]->RisingEdge()) {
+      kick.lowerFreq = 30 + (hw.analogIn[wordIndex] >> (FP_BITS - 7));
+      kick.upperFreq = 150 + (hw.analogIn[wordIndex] >> (FP_BITS - 9));
+      kick.Reset();
+    }
+    fp_signed out = kick.Process();
+    hw.voctOut[wordIndex]->SetAudioFP(out);
+    hw.cvOut[wordIndex]->SetAudioFP(out);
+  }
+};
+
+class ThreeLittleWords : public App {
+public:
+  typedef enum { SEQ, ENV, QUANT, COUNT, DRUM, NUM_WORDTYPES } WordType;
+  App* words[NUM_WORDS] = {NULL, NULL, NULL};
+  WordType wordTypes[NUM_WORDS] = {SEQ, ENV, QUANT};
+  ThreeLittleWords() {
+    for(int i=0;i<NUM_WORDS;i++) {
+      loadWord(i); 
+    }
+  }
+  void loadWord(int word) {
+    WordType type = wordTypes[word];
+    App* oldWord = words[word];
+    App* newWord = NULL;
+    switch(type) {
+      case SEQ: newWord = new LittleSeq(word); break;
+      case ENV: newWord = new LittleEnv(word); break;
+      case QUANT: newWord = new LittleQuant(word); break;
+      case COUNT: newWord = new LittleCount(word); break;
+      case DRUM: newWord = new LittleDrum(word); break;
+      default: return; break;
+    }
+    words[word] = newWord;
+    if(oldWord != NULL) delete oldWord;
+  }
+  void UpdateDisplay() {
+    for(int i=0;i<NUM_WORDS;i++) {
+      if(hw.control[i]->encButtonHeldFor > 20) {
+        hw.control[i]->encButtonHeldFor = 0;
+        wordTypes[i] = (WordType)(((int)wordTypes[i]) + 1);
+        if(wordTypes[i] >= NUM_WORDTYPES) wordTypes[i] = (WordType)0;
+        loadWord(i);
+      }
+      words[i]->UpdateDisplay();
+      if(i>0) {
+        hw.display->drawVLine((i*hw.display->getDisplayWidth())/3-2, 0, hw.display->getDisplayHeight());
+      }
+    }
+  }
+  void Process() {
+    for(int i=0;i<NUM_WORDS;i++) words[i]->Process();
+  }
+};
+
 
 /*
 class Seq : public App {
