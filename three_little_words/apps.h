@@ -792,7 +792,7 @@ public:
 
 class ADEnv {
 public:
-  typedef fp_t<int32_t, 20> phase_t;
+  typedef fp_t<int32_t, 24> phase_t;
   typedef fp_t<int32_t, 0> param_t;
   typedef fp_t<int32_t, 14> audio_t;
   typedef enum { RISING, FALLING, WAITING } state_t;
@@ -801,17 +801,24 @@ public:
   param_t attackSpeed;
   param_t decaySpeed;
   state_t state;
+  bool hold;
   ADEnv() {
     phase = phase_t(0);
     deltaConst = phase_t(0.2/SAMPLE_RATE);
     attackSpeed = param_t(10);
     decaySpeed = param_t(6);
     state = WAITING;
+    hold = false;
   }
-  void Trigger() {
+
+  void Start() {
     state = RISING;
-    phase = 0;
   }
+
+  void Stop() {
+    if(state == RISING && hold) state = FALLING;
+  }
+
   void SetAttackSpeed(int speed) { attackSpeed = param_t(speed); }
   void SetDecaySpeed(int speed) { decaySpeed = param_t(speed); }
   audio_t Process() {
@@ -821,19 +828,22 @@ public:
         out = audio_t(phase);
         phase += deltaConst * attackSpeed;
         if(phase > phase_t(1)) {
-          phase = 0;
-          state = FALLING;
+          phase = phase_t(1);
+          if(!hold) {
+            state = FALLING;
+          }
         }
         break;
       case FALLING:
-        out = audio_t(1) - audio_t(phase);
-        phase += deltaConst * decaySpeed;
-        if(phase > phase_t(1)) {
+        out = audio_t(phase);
+        phase -= deltaConst * decaySpeed;
+        if(phase <= phase_t(0)) {
           phase = 0;
           state = WAITING;
         }
         break;
       case WAITING:
+        out = audio_t(phase);
         break;
     }
     return out;
@@ -852,15 +862,22 @@ public:
 
 class LittleEnv : public LittleApp {
 public:
-  typedef enum { PARAM_ATTACK, PARAM_DECAY, PARAM_LAST } SelectedParam;
+  typedef enum { PARAM_ATTACK, PARAM_DECAY, PARAM_MODE, PARAM_LAST } SelectedParam;
   SelectedParam selectedParam;
   ADEnv env;
   int attackSpeed;
   int decaySpeed;
+  typedef fp_t<int32_t, 14> audio_t;
+  audio_t voctCoef;
+  audio_t cvCoef;
+  bool hold;
   LittleEnv(int wordIndex) : LittleApp(wordIndex) {
     this->selectedParam = PARAM_ATTACK;
-    this->attackSpeed = 10;
+    this->attackSpeed = 12;
     this->decaySpeed = 4;
+    this->hold = true;
+    this->voctCoef = audio_t(5.0/6.49);
+    this->cvCoef = audio_t(5.0/8.72);
   }
   void UpdateDisplay() {
     // handle controls
@@ -874,9 +891,11 @@ public:
         case PARAM_DECAY:
           decaySpeed += encDelta;
           break;
+        case PARAM_MODE:
+          hold = hold ? 0 : 1;
+          break;
       }
     }
-
     // draw UI
     char buffer[64];
     int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
@@ -884,18 +903,26 @@ public:
     hw.display->setFont(u8g2_font_missingplanet_tf);
     sprintf(buffer, "A: %d %s", this->attackSpeed, selectedParam == PARAM_ATTACK ? "*" : "");
     hw.display->drawStr(appOffset+2, 0, buffer);
-    sprintf(buffer, "D: %d %s", this->decaySpeed, selectedParam == PARAM_DECAY ? "*" : "");
+    sprintf(buffer, "%s: %d %s", this->hold ? "R" : "D", this->decaySpeed, selectedParam == PARAM_DECAY ? "*" : "");
     hw.display->drawStr(appOffset+2, 15, buffer);
+    sprintf(buffer, "H: %s %s", this->hold ? "T" : "F", selectedParam == PARAM_MODE ? "*" : "");
+    hw.display->drawStr(appOffset+2, 30, buffer);
   }
   void Process() {
     hw.trigIn[wordIndex]->Update();
-    if(hw.trigIn[wordIndex]->RisingEdge()) env.Trigger();
-    env.SetAttackSpeed(attackSpeed*attackSpeed);
-    env.SetDecaySpeed(decaySpeed*decaySpeed);
+    env.hold = hold;
+    if(hw.trigIn[wordIndex]->RisingEdge()) env.Start();
+    if(hw.trigIn[wordIndex]->FallingEdge()) env.Stop();
+    int speedScaler = hw.analogIn[wordIndex]>>(FP_BITS-8);
+    env.SetAttackSpeed((attackSpeed*attackSpeed*speedScaler)>>7);
+    env.SetDecaySpeed((decaySpeed*decaySpeed*speedScaler)>>7);
+    audio_t envVal = env.Process();
+    audio_t out = audio_t(envVal * voctCoef);
     hw.voctOut[wordIndex]->SetCycles(0);
-    hw.voctOut[wordIndex]->SetCyclesOffset(hw.cvOut[wordIndex]->res - ((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * env.Process())));
+    hw.voctOut[wordIndex]->SetCyclesOffset(((int)(fp_t<int,0>(hw.voctOut[wordIndex]->res)*voctCoef)) - ((int)(fp_t<int,0>(hw.voctOut[wordIndex]->res) * out)));
+    out = audio_t(envVal * cvCoef);
     hw.cvOut[wordIndex]->SetCycles(0);
-    hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * env.Process()));
+    hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * out));
   }
 };
 
@@ -906,6 +933,8 @@ public:
   typedef fp_t<int32_t, 20> phase_t;
   typedef fp_t<int32_t, 0> param_t;
   typedef fp_t<int32_t, 14> audio_t;
+  audio_t voctCoef;
+  audio_t cvCoef;
   audio_t steps[32];
   bool gates[32];
   int len;
@@ -922,6 +951,8 @@ public:
     blinkTime = 0;
     selectedParam = PARAM_LENGTH;
     editMode = 'L';
+    this->voctCoef = audio_t(5.0/6.49);
+    this->cvCoef = audio_t(5.0/8.72);
     for(int i=0;i<32;i++) {
       steps[i] = audio_t(rand()%11 + 1) * audio_t(1.0/12.0);
       gates[i] = i == 0 ? true : false;
@@ -1001,12 +1032,16 @@ public:
       if(readIndex >= len) {
         readIndex = 0;
       }
-      if(gates[readIndex]) clockPulseLength = SAMPLERATE>>10;
+      if(gates[readIndex]) clockPulseLength = SAMPLERATE>>9;
+    }
+    if(hw.analogIn[wordIndex] > ((1<<FP_BITS)*3)/4) {
+      readIndex = 0;
     }
     hw.voctOut[wordIndex]->SetCycles(0);
-    hw.voctOut[wordIndex]->SetCyclesOffset(clockPulseLength-- > 0 && clockPulseLength < SAMPLERATE>>11 ? hw.voctOut[wordIndex]->res : 0);
+    hw.voctOut[wordIndex]->SetCyclesOffset(clockPulseLength-- > 0 && clockPulseLength < SAMPLERATE>>10 ? hw.voctOut[wordIndex]->res : 0);
+    audio_t out = audio_t(steps[readIndex] * cvCoef);
     hw.cvOut[wordIndex]->SetCycles(0);
-    hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * steps[readIndex]));
+    hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * out));
   }
 };
 
@@ -1077,15 +1112,23 @@ public:
       val = fp_t<int32_t, 10>((val + minVal) * fp_t<int32_t, 10>(0.2));
       hw.cvOut[wordIndex]->SetAudioFP((fp_signed)(val*fp_t<int,0>(FP_UNITY)));
     }
+    if(hw.analogIn[wordIndex] > ((1<<FP_BITS)*3)/4) {
+      step = 0;
+      fp_t<int32_t, 10> val = fp_t<int32_t, 10>( ((maxVal - minVal) * fp_t<int32_t, 0>(step)) / fp_t<int32_t, 0>(divs-1) );
+      val = fp_t<int32_t, 10>((val + minVal) * fp_t<int32_t, 10>(0.2));
+      hw.cvOut[wordIndex]->SetAudioFP((fp_signed)(val*fp_t<int,0>(FP_UNITY)));
+    }
   }
 };
 
 class LittleQuant : public LittleApp {
 public:
+  Saw* saw;
   typedef fp_t<int32_t, 20> phase_t;
   typedef fp_t<int32_t, 14> audio_t;
   typedef fp_t<int32_t, 8> voct_t;
   std::vector<int> scale;
+  std::vector<int> scaleFreqs;
   int degree;
   int octave;
   int divs;
@@ -1094,19 +1137,24 @@ public:
   int hitCount;
   voct_t dist;
   LittleQuant(int wordIndex) : LittleApp(wordIndex) {
+    saw = new Saw(220);
     scale.push_back(0);
     scale.push_back(2);
     scale.push_back(3);
     scale.push_back(5);
     scale.push_back(7);
     scale.push_back(8);
-    scale.push_back(11);
+    scale.push_back(10);
+    for(int i=0;i<scale.size();i++) scaleFreqs[i] = (int)(pow(2.0, (float)scale[i])*440.0);
     degree = 0;
     octave = 4;
     divs = 14;
     lastDegree = degree;
     lastOctave = octave;
     hitCount = 0;
+  }
+  ~LittleQuant() {
+    delete saw;
   }
   void UpdateDisplay() {
     char buffer[64];
@@ -1146,6 +1194,8 @@ public:
       octave = oct;
       degree = deg;
 
+      saw->SetFreq(scaleFreqs[degree]<<(oct-2));
+
       lastOctave = oct;
       lastDegree = deg;
     }
@@ -1154,17 +1204,21 @@ public:
     out = out + audio_t(max(octave-1, 0));
 
     hw.voctOut[wordIndex]->SetCVFP((fp_signed)(out*fp_t<int,0>(FP_UNITY)));
+    hw.cvOut[wordIndex]->SetAudioFP(saw->Process());
   }
 };
 
-class LittleDrum : public LittleApp {
+class LittleKick : public LittleApp {
 public:
   Kick kick;
+  ADEnv env;
   typedef enum { PARAM_NULL, PARAM_LAST } SelectedParam;
   SelectedParam selectedParam;
-  ADEnv env;
-  LittleDrum(int wordIndex) : LittleApp(wordIndex) {
+
+  LittleKick(int wordIndex) : LittleApp(wordIndex) {
     this->selectedParam = PARAM_NULL;
+    env.attackSpeed = 1000;
+    env.decaySpeed = 40;
   }
   void UpdateDisplay() {
     // handle controls
@@ -1195,25 +1249,184 @@ public:
       kick.lowerFreq = 30 + (hw.analogIn[wordIndex] >> (FP_BITS - 7));
       kick.upperFreq = 150 + (hw.analogIn[wordIndex] >> (FP_BITS - 9));
       kick.Reset();
+      env.Start();
     }
     fp_signed out = kick.Process();
-    hw.voctOut[wordIndex]->SetAudioFP(out);
+    hw.voctOut[wordIndex]->SetCycles(0);
+    hw.voctOut[wordIndex]->SetCyclesOffset(hw.voctOut[wordIndex]->res - ((int)(fp_t<int,0>(hw.voctOut[wordIndex]->res) * env.Process())));
     hw.cvOut[wordIndex]->SetAudioFP(out);
+  }
+};
+
+class LittleFollower : public LittleApp {
+  public:
+  typedef fp_t<int32_t, 14> audio_t;
+  audio_t lastVal;
+  audio_t gain;
+  audio_t voctCoef;
+  audio_t cvCoef;
+  LittleFollower(int wordIndex) : LittleApp(wordIndex) {
+    lastVal = 0;
+    gain = audio_t(1);
+    this->voctCoef = audio_t(5.0/6.49);
+    this->cvCoef = audio_t(5.0/8.72);
+  }
+  void UpdateDisplay() {
+    char buffer[64];
+
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0) {
+      gain = gain + (audio_t(encDelta)>>4);
+      gain = max(audio_t(0), min(audio_t(20), gain));
+    }
+
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/3 - 1;
+    hw.display->setFont(u8g2_font_missingplanet_tf);
+    sprintf(buffer, " FLW");
+    hw.display->drawStr(appOffset+2, 0, buffer);
+    sprintf(buffer, " %1.2fv", float(lastVal>>13)*5.0);
+    hw.display->drawStr(appOffset+2, 15, buffer);
+    sprintf(buffer, " %1.2fx", float(gain));
+    hw.display->drawStr(appOffset+2, 30, buffer);
+  }
+  void Process() {
+    audio_t curVal = audio_t(abs(hw.analogIn[wordIndex]-(1<<(FP_BITS-1))));
+    audio_t diff = curVal - lastVal;
+    lastVal += diff>>10;
+    audio_t clippedVal = max(audio_t(0), min(audio_t(1), audio_t((lastVal>>13)*gain)));
+
+    audio_t out = audio_t(clippedVal * voctCoef);
+    hw.voctOut[wordIndex]->SetCycles(0);
+    hw.voctOut[wordIndex]->SetCyclesOffset(((int)(fp_t<int,0>(hw.voctOut[wordIndex]->res)*voctCoef)) - ((int)(fp_t<int,0>(hw.voctOut[wordIndex]->res) * out)));
+    out = audio_t(clippedVal * cvCoef);
+    hw.cvOut[wordIndex]->SetCycles(0);
+    hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * out));
+  }
+};
+
+class LFSR {
+public:
+  int bits;
+  unsigned int mask;
+  unsigned int val;
+  unsigned int GetBit(int i) { return (this->val&(1<<i)) > 0 ? 1 : 0; }
+  void SetBit(int i, unsigned int v) { val = val | (v<<i); }
+  LFSR(int bits=16, unsigned int mask=1) {
+    this->bits = bits;
+    this->val = 0;
+    this->mask = mask;
+  }
+  int Process() {
+    unsigned int retVal = 0;
+    for(int i=0;i<bits;i++) {
+      if(mask&(1<<i)) retVal = retVal^GetBit(i);
+    }
+    retVal = !retVal;
+    this->val = this->val>>1;
+    SetBit(bits-1, retVal);
+    return retVal;
+  }
+};
+
+class LittleShift : public LittleApp {
+public:
+  typedef enum { PARAM_BITS, /*PARAM_MASK, PARAM_RATE,*/ PARAM_LAST } SelectedParam;
+  SelectedParam selectedParam;
+  typedef fp_t<int32_t, 14> audio_t;
+  audio_t voctCoef;
+  audio_t cvCoef;
+  LFSR shift;
+  LittleShift(int wordIndex) : LittleApp(wordIndex) {
+
+  }
+  void UpdateDisplay() {
+    // handle controls
+    if(hw.control[wordIndex]->encButtonPressed()) selectedParam = (SelectedParam)(((int)selectedParam + 1) % PARAM_LAST);
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0) {
+      switch(selectedParam) {
+        case PARAM_BITS:
+          shift.bits += encDelta;
+          break;
+        /*
+        case PARAM_MASK:
+          shift.mask += encDelta;
+          break;
+        case PARAM_RATE:
+          break;
+        */
+      }
+    }
+
+    // draw UI
+    char buffer[64];
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/12 - 1;
+    int barHeight = hw.display->getDisplayHeight()/shift.bits - 1;
+    for(int i=0;i<shift.bits;i++) {
+      if(shift.GetBit((shift.bits-1)-i)) {
+        hw.display->drawBox(
+          appOffset + 2,
+          (i*hw.display->getDisplayHeight())/shift.bits,
+          appWidth-3,
+          barHeight
+        );
+      } else {
+        hw.display->drawFrame(
+          appOffset + 2,
+          (i*hw.display->getDisplayHeight())/shift.bits,
+          appWidth-3,
+          barHeight
+        );
+      }
+    }
+
+    //hw.display->setFont(u8g2_font_missingplanet_tf);
+    //sprintf(buffer, "A: %d %s", this->attackSpeed, selectedParam == PARAM_ATTACK ? "*" : "");
+  }
+  void Process() {
+    uint32_t mask = abs((hw.analogIn[wordIndex]>>(FP_BITS-9))-(1<<8));
+    mask = mask | (mask<<8) | (mask<<16) | (mask<<24);
+    shift.mask = mask;
+    hw.trigIn[wordIndex]->Update();
+    if(hw.trigIn[wordIndex]->RisingEdge()) {
+      shift.Process();
+      hw.voctOut[wordIndex]->SetCycles(0);
+      hw.voctOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.voctOut[wordIndex]->res) * fp_t<int,0>(shift.GetBit(0))));
+      hw.cvOut[wordIndex]->SetCycles(0);
+      hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * fp_t<int,0>(shift.GetBit(0))));
+    }
+    else
+    {
+      if(hw.trigIn[wordIndex]->FallingEdge()) {
+      hw.cvOut[wordIndex]->SetCyclesOffset(0);
+      }
+    }
+    /*
+    hw.trigIn[wordIndex]->Update();
+    if(hw.trigIn[wordIndex]->RisingEdge()) env.Start();
+    if(hw.trigIn[wordIndex]->FallingEdge()) env.Stop();
+    hw.voctOut[wordIndex]->SetCycles(0);
+    hw.voctOut[wordIndex]->SetCyclesOffset(((int)(fp_t<int,0>(hw.voctOut[wordIndex]->res)*voctCoef)) - ((int)(fp_t<int,0>(hw.voctOut[wordIndex]->res) * out)));
+    hw.cvOut[wordIndex]->SetCycles(0);
+    hw.cvOut[wordIndex]->SetCyclesOffset((int)(fp_t<int,0>(hw.cvOut[wordIndex]->res) * out));
+    */
   }
 };
 
 class ThreeLittleWords : public App {
 public:
-  typedef enum { SEQ, ENV, QUANT, COUNT, DRUM, NUM_WORDTYPES } WordType;
+  typedef enum { SEQ, ENV, QUANT, COUNT, DRUM, FOLLOWER, SHIFT, NUM_WORDTYPES } WordType;
   App* words[NUM_WORDS] = {NULL, NULL, NULL};
-  WordType wordTypes[NUM_WORDS] = {SEQ, ENV, QUANT};
+  WordType littleWords[NUM_WORDS] = {SEQ, ENV, QUANT};
   ThreeLittleWords() {
     for(int i=0;i<NUM_WORDS;i++) {
       loadWord(i); 
     }
   }
   void loadWord(int word) {
-    WordType type = wordTypes[word];
+    WordType type = littleWords[word];
     App* oldWord = words[word];
     App* newWord = NULL;
     switch(type) {
@@ -1221,7 +1434,9 @@ public:
       case ENV: newWord = new LittleEnv(word); break;
       case QUANT: newWord = new LittleQuant(word); break;
       case COUNT: newWord = new LittleCount(word); break;
-      case DRUM: newWord = new LittleDrum(word); break;
+      case DRUM: newWord = new LittleKick(word); break;
+      case FOLLOWER: newWord = new LittleFollower(word); break;
+      case SHIFT: newWord = new LittleShift(word); break;
       default: return; break;
     }
     words[word] = newWord;
@@ -1231,8 +1446,8 @@ public:
     for(int i=0;i<NUM_WORDS;i++) {
       if(hw.control[i]->encButtonHeldFor > 20) {
         hw.control[i]->encButtonHeldFor = 0;
-        wordTypes[i] = (WordType)(((int)wordTypes[i]) + 1);
-        if(wordTypes[i] >= NUM_WORDTYPES) wordTypes[i] = (WordType)0;
+        littleWords[i] = (WordType)(((int)littleWords[i]) + 1);
+        if(littleWords[i] >= NUM_WORDTYPES) littleWords[i] = (WordType)0;
         loadWord(i);
       }
       words[i]->UpdateDisplay();
