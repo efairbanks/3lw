@@ -1,3 +1,4 @@
 three_little_words-backups
-.vscode/c_cpp_properties.json
 fp-info-cache
+.vscode
+.vscode/**

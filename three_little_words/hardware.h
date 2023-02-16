@@ -7,7 +7,11 @@
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
-#include "fpmath.h"
+
+#include "fp.hpp"
+
+using namespace fp;
+using namespace fp::constants;
 
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
@@ -167,19 +171,19 @@ public:
   uint offset;
   double negMax;
   double posMax;
-  fp_signed negMaxFP;
-  fp_signed posMaxFP;
-  fp_signed invNegMaxFP;
-  fp_signed invPosMaxFP;
+  fp_t<int, 14> negMaxFP;
+  fp_t<int, 14> posMaxFP;
+  fp_t<int, 14> invNegMaxFP;
+  fp_t<int, 14> invPosMaxFP;
   AnalogOut(int offset, int resolution = 255, double negMax = VOCT_NOUT_MAX, double posMax = VOCT_POUT_MAX) {
     this->offset = offset;
     this->res = resolution;
     this->negMax = negMax;
     this->posMax = posMax;
-    this->negMaxFP = FLOAT2FP(negMax);
-    this->posMaxFP = FLOAT2FP(posMax);
-    this->invNegMaxFP = FP_DIV(FP_UNITY, FLOAT2FP(negMax));
-    this->invPosMaxFP = FP_DIV(FP_UNITY, FLOAT2FP(posMax));
+    this->negMaxFP = fp_t<int, 14>(negMax);
+    this->posMaxFP = fp_t<int, 14>(posMax);
+    this->invNegMaxFP = fp_t<int, 14>(1.0 / negMax);
+    this->invPosMaxFP = fp_t<int, 14>(1.0 / posMax);
     for(uint16_t i=0;i<2;i++) {
       uint slice_num = pwm_gpio_to_slice_num(i + offset);
       pwm_config cfg = pwm_get_default_config();
@@ -204,23 +208,13 @@ public:
     pwm_set_gpio_level(offset+1, (uint16_t)cycles);
   }
 
-  /*
-  void SetOutputVoltage(double v) {
-    Set(offset, ((negMax-v))/negMax);
+  void SetBipolar(fp_t<int, 14> v) {
+    pwm_set_gpio_level(offset, int(fp_t<int, 0>(res) * fp_t<int, 14>((posMaxFP>>1) * invNegMaxFP)));
+    pwm_set_gpio_level(offset+1, (res>>1) + int(fp_t<int, 0>(res>>1) * v));
   }
-  void SetOffsetVoltage(double v) {
-    Set(offset + 1, (v)/posMax);
-  }
-  */
-  void SetAudioFP(fp_signed v) {
-    fp_signed offsetCoef = FP_DIV(FP_UNITY, FLOAT2FP(VOCT_NOUT_MAX));
-    pwm_set_gpio_level(offset, FP_MUL(res, FP_MUL(posMaxFP>>1, invNegMaxFP)));
-    pwm_set_gpio_level(offset+1, (res>>1) + FP_MUL((res>>1), v));
-  }
-  void SetCVFP(fp_signed v) {
-    while(v>negMaxFP) v-= FP_UNITY;
-    pwm_set_gpio_level(offset, res - FP_MUL(res, FP_MUL(v, invNegMaxFP)));
-    pwm_set_gpio_level(offset+1, FP_MUL(res, FP_MUL(invPosMaxFP, negMaxFP)));
+  void SetUnipolar(fp_t<int, 14> v) {
+    pwm_set_gpio_level(offset, 0);
+    pwm_set_gpio_level(offset+1, int(fp_t<int, 0>(res) * v));
   }
 };
 
@@ -233,7 +227,7 @@ public:
   U8G2_SSD1306_128X64_NONAME_F_HW_I2C* display;
   ButtonAndEncoder* control[NUM_WORDS];
   GateTrigger* trigIn[NUM_WORDS];
-  fp_signed analogIn[NUM_WORDS];
+  fp_t<int, 12> analogIn[NUM_WORDS];
   AnalogOut* voctOut[NUM_WORDS];
   AnalogOut* cvOut[NUM_WORDS];
 
@@ -246,7 +240,7 @@ public:
   static bool audioHandler(struct repeating_timer *t) {
     while(multicore_fifo_rvalid()) {
       uint32_t val = multicore_fifo_pop_blocking();
-      _tlwhw_->analogIn[val>>24] = val & 0x00FFFFFF;
+      _tlwhw_->analogIn[val>>24] = fp_t<int, 12>(val & 0x00FFFFFF) >> 12;
     }
     if(_audioCallback_ != NULL) _audioCallback_();
     return true;
@@ -262,9 +256,16 @@ public:
     }
     while(1) {
       if(multicore_fifo_wready()) {
-        for(int i=0;i<3;i++) {
-          channelAccumulators[activeAdcChannel] = ((adc_read()<<2) + channelAccumulators[activeAdcChannel]*3)>>2;
+        const float smoothingFactor = 0.8;
+        const int oversampling = 3;
+        uint32_t temp = 0;
+        for(int i=0;i<oversampling;i++) {
+          temp += adc_read();
         }
+        channelAccumulators[activeAdcChannel] = uint32_t(
+          fp_t<int, 0>(channelAccumulators[activeAdcChannel]) * fp_t<int, 14>(1.0 - smoothingFactor) + \
+          fp_t<int, 0>(temp) * fp_t<int, 14>(smoothingFactor / oversampling)
+        );
         multicore_fifo_push_blocking(((channelAccumulators[activeAdcChannel])&0x00FFFFFF) | (activeAdcChannel<<24));
         if(++activeAdcChannel>=NUM_WORDS) activeAdcChannel = 0;
         adc_select_input(activeAdcChannel);
