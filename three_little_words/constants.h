@@ -8,9 +8,9 @@
 #define OFFSET_OUT_PIN 1
 
 #define VIN_5V0 5.11
-#define VIN_5V0_FP fp_t<int, 14>(VIN_5V0)
-#define VIN_3V3 3.2
-#define VIN_3V3_FP fp_t<int, 14>(VIN_3V3)
+#define VIN_5V0_FP fp_t<int, 12>(VIN_5V0)
+#define VIN_3V3 3.33
+#define VIN_3V3_FP fp_t<int, 12>(VIN_3V3)
 #define VOCT_R1 1000.0
 #define VOCT_R2 1000.0
 #define CV_R1   4700.0

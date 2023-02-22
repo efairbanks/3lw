@@ -19,9 +19,11 @@ void audio_callback() {
 App* getAppByIndex(int index) {
   switch(index) {
     case 0:
+      return new MultiSeq();
+    case 1:
       return new ThreeLittleWords();
     default:
-      return getAppByIndex(index%1);
+      return getAppByIndex(index%2);
   }
 }
 
@@ -48,7 +50,7 @@ void setup() {
 void loop() {
   hw.Update();
 
-  if(hw.control[0]->topButtonHeld && hw.control[2]->topButtonPressed()) {
+  if(hw.control[0]->topButtonHeld && hw.control[1]->topButtonHeld && hw.control[2]->topButtonPressed()) {
     hw.SetAudioCallback(NULL);
     sleep_ms(10);
     delete app;

@@ -169,21 +169,17 @@ class AnalogOut {
 public:
   uint16_t res;
   uint offset;
-  double negMax;
-  double posMax;
-  fp_t<int, 14> negMaxFP;
-  fp_t<int, 14> posMaxFP;
-  fp_t<int, 14> invNegMaxFP;
-  fp_t<int, 14> invPosMaxFP;
+  fp_t<int, 12> bipolarOffset;
+  fp_t<int, 12> bipolarCoef;
+  fp_t<int, 12> unipolarCoef;
   AnalogOut(int offset, int resolution = 255, double negMax = VOCT_NOUT_MAX, double posMax = VOCT_POUT_MAX) {
     this->offset = offset;
     this->res = resolution;
-    this->negMax = negMax;
-    this->posMax = posMax;
-    this->negMaxFP = fp_t<int, 14>(negMax);
-    this->posMaxFP = fp_t<int, 14>(posMax);
-    this->invNegMaxFP = fp_t<int, 14>(1.0 / negMax);
-    this->invPosMaxFP = fp_t<int, 14>(1.0 / posMax);
+    // --- //
+    this->bipolarOffset = fp_t<int, 12>(posMax * 0.5 / negMax);
+    this->bipolarCoef = fp_t<int, 12>(1.0 / (posMax / 2.0));
+    this->unipolarCoef = fp_t<int, 12>(1.0 / posMax);
+    // --- //
     for(uint16_t i=0;i<2;i++) {
       uint slice_num = pwm_gpio_to_slice_num(i + offset);
       pwm_config cfg = pwm_get_default_config();
@@ -208,13 +204,13 @@ public:
     pwm_set_gpio_level(offset+1, (uint16_t)cycles);
   }
 
-  void SetBipolar(fp_t<int, 14> v) {
-    pwm_set_gpio_level(offset, int(fp_t<int, 0>(res) * fp_t<int, 14>((posMaxFP>>1) * invNegMaxFP)));
-    pwm_set_gpio_level(offset+1, (res>>1) + int(fp_t<int, 0>(res>>1) * v));
+  void SetBipolar(fp_t<int, 12> v) {
+    pwm_set_gpio_level(offset, int(fp_t<int, 0>(res) * bipolarOffset));
+    pwm_set_gpio_level(offset+1, (res>>1) + int(fp_t<int, 0>(res>>1) * fp_t<int, 12>(v * bipolarCoef)));
   }
-  void SetUnipolar(fp_t<int, 14> v) {
+  void SetUnipolar(fp_t<int, 12> v) {
     pwm_set_gpio_level(offset, 0);
-    pwm_set_gpio_level(offset+1, int(fp_t<int, 0>(res) * v));
+    pwm_set_gpio_level(offset+1, int(fp_t<int, 0>(res) * fp_t<int, 12>(v * unipolarCoef)));
   }
 };
 
@@ -240,7 +236,7 @@ public:
   static bool audioHandler(struct repeating_timer *t) {
     while(multicore_fifo_rvalid()) {
       uint32_t val = multicore_fifo_pop_blocking();
-      _tlwhw_->analogIn[val>>24] = fp_t<int, 12>(val & 0x00FFFFFF) >> 12;
+      _tlwhw_->analogIn[val>>24] = ((fp_t<int, 12>(val & 0x00FFFFFF) >> 11) - fp_t<int, 12>(1)) * fp_t<int, 0>(5);
     }
     if(_audioCallback_ != NULL) _audioCallback_();
     return true;
@@ -263,8 +259,8 @@ public:
           temp += adc_read();
         }
         channelAccumulators[activeAdcChannel] = uint32_t(
-          fp_t<int, 0>(channelAccumulators[activeAdcChannel]) * fp_t<int, 14>(1.0 - smoothingFactor) + \
-          fp_t<int, 0>(temp) * fp_t<int, 14>(smoothingFactor / oversampling)
+          fp_t<int, 0>(channelAccumulators[activeAdcChannel]) * fp_t<int, 12>(1.0 - smoothingFactor) + \
+          fp_t<int, 0>(temp) * fp_t<int, 12>(smoothingFactor / oversampling)
         );
         multicore_fifo_push_blocking(((channelAccumulators[activeAdcChannel])&0x00FFFFFF) | (activeAdcChannel<<24));
         if(++activeAdcChannel>=NUM_WORDS) activeAdcChannel = 0;
