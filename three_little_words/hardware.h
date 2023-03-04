@@ -233,10 +233,29 @@ public:
     }
   }
 
+  static fp_t<int, 12> mix(fp_t<int, 12> a, fp_t<int, 12> b, fp_t<int, 12> x) {
+    if(x > fp_t<int, 12>(1)) x = fp_t<int, 12>(1);
+    if(x < fp_t<int, 12>(0)) x = fp_t<int, 12>(0);
+    return fp_t<int, 12>(a * (fp_t<int, 12>(1) - x)) + fp_t<int, 12>(b * x);
+  }
+
+  static fp_t<int, 12> pow4(fp_t<int, 12> x) {
+    return fp_t<int, 12>(x * x) * fp_t<int, 12>(x * x);
+  }
+
   static bool audioHandler(struct repeating_timer *t) {
     while(multicore_fifo_rvalid()) {
       uint32_t val = multicore_fifo_pop_blocking();
-      _tlwhw_->analogIn[val>>24] = ((fp_t<int, 12>(val & 0x00FFFFFF) >> 11) - fp_t<int, 12>(1)) * fp_t<int, 0>(5);
+
+      // approximate nonlinear twiddle factor magic
+      #define HW_OFFSET (fp_t<int, 12>(0.04))
+      #define HW_COEF_A (fp_t<int, 12>(1.10988))
+      #define HW_COEF_B (fp_t<int, 12>(0.96805))
+      fp_t<int, 12> inVal = ((fp_t<int, 12>(val & 0x00FFFFFF)>>12) - HW_OFFSET) * HW_COEF_A;
+      inVal = inVal * mix(fp_t<int, 12>(1), HW_COEF_B, fp_t<int, 12>(pow4(inVal)));
+      inVal = inVal * fp_t<int, 0>(10) - fp_t<int, 0>(5);
+
+      _tlwhw_->analogIn[val>>24] = inVal;
     }
     if(_audioCallback_ != NULL) _audioCallback_();
     return true;
@@ -280,8 +299,8 @@ public:
         gpio_set_irq_enabled_with_callback(ENC_BTN_CW[i], GPIO_IRQ_EDGE_FALL, true, &controlHandler);
         trigIn[i]   = new GateTrigger(TRIG_IN[i]);
         analogIn[i] = 0;
-        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i], 1024, VOCT_NOUT_MAX, VOCT_POUT_MAX);
-        cvOut[i]    = new AnalogOut(CV_OFFSET[i], 1024, CV_NOUT_MAX, CV_POUT_MAX);
+        voctOut[i]  = new AnalogOut(VOCT_OFFSET[i], 240, VOCT_NOUT_MAX, VOCT_POUT_MAX);
+        cvOut[i]    = new AnalogOut(CV_OFFSET[i], 240, CV_NOUT_MAX, CV_POUT_MAX);
       }
 
       multicore_launch_core1(core1Entry);

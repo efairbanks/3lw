@@ -251,20 +251,28 @@ public:
 class LittleEnv : public LittleApp {
 public:
   typedef enum { PARAM_ATTACK, PARAM_DECAY, PARAM_MODE, PARAM_LAST } SelectedParam;
+  typedef fp_t<int, 10> param_t;
+  typedef fp_t<int, 12> audio_t;
   SelectedParam selectedParam;
   ADEnv env;
-  int attackSpeed;
-  int decaySpeed;
-  typedef fp_t<int, 12> audio_t;
-  audio_t voctCoef;
-  audio_t cvCoef;
+  param_t attackSpeed;
+  param_t decaySpeed;
+  audio_t lastOut;
   bool hold;
   LittleEnv(int wordIndex) : LittleApp(wordIndex) {
     this->selectedParam = PARAM_ATTACK;
-    this->attackSpeed = 12;
-    this->decaySpeed = 4;
-    this->hold = true;
+    this->attackSpeed = param_t(0);
+    this->decaySpeed = param_t(0.30);
+    this->hold = false;
+    this->lastOut = 0;
   }
+
+  param_t pclip(param_t x, param_t min = param_t(0), param_t max = param_t(1)) {
+    if(x > max) x = max;
+    if(x < min) x = min;
+    return x;
+  }
+
   void UpdateDisplay() {
     // handle controls
     if(hw.control[wordIndex]->encButtonPressed()) selectedParam = (SelectedParam)(((int)selectedParam + 1) % PARAM_LAST);
@@ -272,10 +280,10 @@ public:
     if(encDelta != 0) {
       switch(selectedParam) {
         case PARAM_ATTACK:
-          attackSpeed += encDelta;
+          attackSpeed = pclip(attackSpeed + param_t(encDelta) * param_t(0.02));
           break;
         case PARAM_DECAY:
-          decaySpeed += encDelta;
+          decaySpeed = pclip(decaySpeed + param_t(encDelta) * param_t(0.02));
           break;
         case PARAM_MODE:
           hold = hold ? 0 : 1;
@@ -287,22 +295,28 @@ public:
     int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
     int appWidth = hw.display->getDisplayWidth()/3 - 1;
     hw.display->setFont(u8g2_font_baby_tf);
-    sprintf(buffer, "A: %d %s", this->attackSpeed, selectedParam == PARAM_ATTACK ? "*" : "");
-    hw.display->drawStr(appOffset+2, 0, buffer);
-    sprintf(buffer, "%s: %d %s", this->hold ? "R" : "D", this->decaySpeed, selectedParam == PARAM_DECAY ? "*" : "");
-    hw.display->drawStr(appOffset+2, 15, buffer);
-    sprintf(buffer, "H: %s %s", this->hold ? "T" : "F", selectedParam == PARAM_MODE ? "*" : "");
-    hw.display->drawStr(appOffset+2, 30, buffer);
+    sprintf(buffer, "%1sA:%d", selectedParam == PARAM_ATTACK ? "|" : "", int(this->attackSpeed * fp_t<int, 0>(100)));
+    hw.display->drawStr(appOffset, 0, buffer);
+    sprintf(buffer, "%1s%s:%d", selectedParam == PARAM_DECAY ? "|" : "", this->hold ? "R" : "D", int(this->decaySpeed * fp_t<int, 0>(100)));
+    hw.display->drawStr(appOffset, 8, buffer);
+    sprintf(buffer, "%1sH:%s ", selectedParam == PARAM_MODE ? "|" : "", this->hold ? "T" : "F");
+    hw.display->drawStr(appOffset, 16, buffer);
+
+    drawMeter(appOffset + appWidth/3, 16, appWidth/3, hw.display->getDisplayHeight() - 16, 2, true, lastOut);
   }
   void Process() {
     hw.trigIn[wordIndex]->Update();
     env.hold = hold;
     if(hw.trigIn[wordIndex]->RisingEdge()) env.Start();
     if(hw.trigIn[wordIndex]->FallingEdge()) env.Stop();
-    int speedScaler = int(hw.analogIn[wordIndex] * fp_t<int, 0>(128)); // FP_BITS
-    env.SetAttackSpeed((attackSpeed*attackSpeed*speedScaler)>>7);
-    env.SetDecaySpeed((decaySpeed*decaySpeed*speedScaler)>>7);
-    audio_t envVal = (env.Process() + fp_t<int, 0>(5)) >> 1;
+    param_t mAttackSpeed = pclip(attackSpeed + param_t(hw.analogIn[wordIndex] * audio_t(0.3 / 5.0)));
+    param_t mDecaySpeed = pclip(decaySpeed + param_t(hw.analogIn[wordIndex] * audio_t(0.3 / 5.0)));
+    env.SetAttackSpeed(mAttackSpeed);
+    env.SetDecaySpeed(mDecaySpeed);
+    audio_t out = env.Process();
+    out = out * out;
+    lastOut = out;
+    audio_t envVal = lastOut * fp_t<int, 0>(5);
     hw.voctOut[wordIndex]->SetUnipolar(envVal);
     hw.cvOut[wordIndex]->SetUnipolar(envVal);
   }
@@ -447,10 +461,6 @@ public:
     sprintf(buffer, "x%d", multiplier);
     hw.display->drawStr(appOffset+8, 8, buffer);
 
-    // draw VU meter
-    //drawMeter(appOffset, 2, 15, 50, 2, true, out);
-    //drawMeter(appOffset + 15, 2, 15, 50, 2, false, out);
-
     drawHollowBox(appOffset + 1, 33, appWidth - 2, 30, 0);
     DrawWaveform(appOffset + 3, 35, appWidth - 6, 26);
   }
@@ -473,9 +483,139 @@ public:
   }
 };
 
+/*
+class LittleMeter : public LittleApp {
+public:
+  typedef enum { PARAM_NONE, PARAM_LAST } SelectedParam;
+
+  SelectedParam selectedParam;
+  ClockRateDetector clockDetector;
+  Phasor lfo;
+  int none;
+  fp_t<int, 26> lastInput;
+
+  LittleMeter(int wordIndex) : LittleApp(wordIndex) {
+    selectedParam = PARAM_NONE;
+    none = 0;
+  }
+
+  void UpdateDisplay() {
+    // handle controls
+    if(hw.control[wordIndex]->encButtonPressed()) selectedParam = (SelectedParam)(((int)selectedParam + 1) % PARAM_LAST);
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0) {
+      switch(selectedParam) {
+        case PARAM_NONE:
+          none = max(1,min(32, none + encDelta));
+          break;
+      }
+    }
+
+    // prep UI
+    char buffer[64];
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/3 - 1;
+    hw.display->setFont(u8g2_font_baby_tf);
+
+    fp_t<int, 12> out = lastInput;
+
+    // draw UI text
+    sprintf(buffer, "METER");
+    hw.display->drawStr(appOffset+8, 0, buffer);
+    sprintf(buffer, "%d", int(out*fp_t<int, 0>(1000)));
+    hw.display->drawStr(appOffset+8, 8, buffer);
+
+    // draw VU meter
+    drawMeter(appOffset + appWidth/3, 16, appWidth/3, hw.display->getDisplayHeight() - 16, 2, true, (out + fp_t<int, 12>(5)) * fp_t<int, 12>(1.0 / 10.0));
+  }
+
+  void Process() {
+    fp_t<int, 26> delta = hw.analogIn[wordIndex] - lastInput;
+    lastInput = lastInput + (delta>>15);
+  }
+};
+*/
+
+class LittleClock : public LittleApp {
+public:
+  typedef enum { PARAM_BPM, PARAM_MULT_A, PARAM_MULT_B, PARAM_LAST } SelectedParam;
+
+  SelectedParam selectedParam;
+  ClockRateDetector clockDetector;
+  TrigDetector trigDetectorA;
+  TrigDetector trigDetectorB;
+  TrigGen trigA;
+  TrigGen trigB;
+  Phasor clock;
+  int multiplierA;
+  int multiplierB;
+  int bpm;
+
+  LittleClock(int wordIndex) : trigA(0, 120), trigB(0, 120), LittleApp(wordIndex) {
+    bpm = 120;
+    selectedParam = PARAM_BPM;
+    multiplierA = 1;
+    multiplierB = 4;
+    clock.SetBPM(bpm);
+  }
+
+  void UpdateDisplay() {
+    // handle controls
+    if(hw.control[wordIndex]->encButtonPressed()) selectedParam = (SelectedParam)(((int)selectedParam + 1) % PARAM_LAST);
+    int encDelta = hw.control[wordIndex]->GetDelta();
+    if(encDelta != 0) {
+      switch(selectedParam) {
+        case PARAM_BPM:
+          bpm = max(30,min(300, bpm + encDelta));
+          clock.SetBPM(bpm);
+          break;
+        case PARAM_MULT_A:
+          multiplierA = max(1,min(32, multiplierA + encDelta));
+          break;
+        case PARAM_MULT_B:
+          multiplierB = max(1,min(32, multiplierB + encDelta));
+          break;
+      }
+    }
+
+    // prep UI
+    char buffer[64];
+    int appOffset = (wordIndex*hw.display->getDisplayWidth())/NUM_WORDS;
+    int appWidth = hw.display->getDisplayWidth()/3 - 1;
+    hw.display->setFont(u8g2_font_baby_tf);
+
+    // draw UI text
+    if(selectedParam == PARAM_BPM) drawHollowBox(-1 + appOffset, -1 + 0, appWidth - 1, 11, 1);
+    sprintf(buffer, "BPM:  %d", bpm);
+    hw.display->drawStr(2 + appOffset, 0, buffer);
+    if(selectedParam == PARAM_MULT_A) drawHollowBox(-1 + appOffset, -1 + 10, appWidth - 1, 11, 1);
+    sprintf(buffer, "A:    x%d", multiplierA);
+    hw.display->drawStr(2 + appOffset, 10, buffer);
+    if(selectedParam == PARAM_MULT_B) drawHollowBox(-1 + appOffset, -1 + 20, appWidth - 1, 11, 1);
+    sprintf(buffer, "B:    x%d", multiplierB);
+    hw.display->drawStr(2 + appOffset, 20, buffer);
+  }
+
+  const fp_t<int, 12> multPhase(fp_t<int, 12> x, int m)
+  {
+    int temp = int(x<<12);
+    temp = (temp * m) & 0x0FFF;
+    return fp_t<int, 12>(temp)>>12;
+  }
+
+  void Process() {
+    if(trigDetectorA.Process(fp_t<int, 12>(5) - multPhase(fp_t<int, 12>(clock.phase), multiplierA) * fp_t<int, 0>(5))) trigA.Reset();
+    if(trigDetectorB.Process(fp_t<int, 12>(5) - multPhase(fp_t<int, 12>(clock.phase), multiplierB) * fp_t<int, 0>(5))) trigB.Reset();
+    clock.Process();
+
+    hw.voctOut[wordIndex]->SetUnipolar(trigA.Process() * fp_t<int, 0>(5.0));
+    hw.cvOut[wordIndex]->SetUnipolar(trigB.Process() * fp_t<int, 0>(5.0));
+  }
+};
+
 class ThreeLittleWords : public App {
 public:
-  typedef enum { ENV, COUNT, LFO, NUM_WORDTYPES } WordType;
+  typedef enum { ENV, COUNT, LFO, CLOCK, NUM_WORDTYPES } WordType;
   App* words[NUM_WORDS] = {NULL, NULL, NULL};
   WordType littleWords[NUM_WORDS] = {ENV, COUNT, LFO};
   ThreeLittleWords() {
@@ -491,6 +631,7 @@ public:
       case ENV:   newWord = new LittleEnv(word);    break;
       case COUNT: newWord = new LittleCount(word);  break;
       case LFO:   newWord = new LittleLFO(word);    break;
+      case CLOCK: newWord = new LittleClock(word);  break;
       default: return; break;
     }
     words[word] = newWord;
