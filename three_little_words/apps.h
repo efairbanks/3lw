@@ -789,4 +789,62 @@ public:
   }
 };
 
+class ChordGen : public App {
+public:
+  int wrapInterval(int x, int n=12) { while(x < 0) x+= n; while(x >= n) x-=n; return x; }
+  int intervalToFreq(int interval) { return (int)(256.0 * pow(2.0, interval/12.0)); }
+  int invertFreq(int freq, int min, int max) { while(freq < min) freq *= 2; while(freq >= max) freq /= 2; return freq; }
+  std::vector<int> generateIntervals(bool major = 0, int numIntervals = 24) {
+      std::vector<int> intervals;
+      int lastInterval = 0;
+      for(int i=0; i<numIntervals; i++) {
+          intervals.push_back(lastInterval % 12);
+          lastInterval += major ? 4 : 3;
+          major = !major;
+      }
+      return intervals;
+  }
+
+  Phasor oscs[3];
+  std::vector<int> intervals;
+  std::vector<int> freqs;
+  int index = 0;
+  int targetFreq = 256;
+
+  ChordGen() {
+    intervals = generateIntervals();
+    for(int i=0; i<intervals.size(); i++) freqs.push_back(intervalToFreq(intervals[i]));
+  }
+
+  void UpdateDisplay() {
+    char buffer[64];
+    int one3rdHeight = hw.display->getHeight() / 3;
+    int one12thWidth = hw.display->getWidth() / 12;
+    for(int i=0; i<12; i++) {
+      if(i == 1 || i == 3 || i == 6 || i == 8 || i == 10) {
+        drawFilledBox(i*one12thWidth, 0, one12thWidth, one3rdHeight*2, 2);
+      } else {
+        drawHollowBox(i*one12thWidth, 0, one12thWidth, one3rdHeight*2, 2);
+      }
+      drawHollowBox(i*one12thWidth, one3rdHeight, one12thWidth, one3rdHeight, 2);
+    }
+    for(int i=0; i<3; i++) {
+      int currentInterval = intervals[wrapInterval(index + i)];
+      drawFilledBox(currentInterval*one12thWidth, one3rdHeight, one12thWidth, one3rdHeight, 4);
+    }
+  }
+
+  void Process() {
+    index = wrapInterval((int)(fp_t<int, 12>(hw.analogIn[0]) * fp_t<int, 12>(12.0 / 5.0)));
+    fp_t<int, 12> scaledInput = (fp_t<int, 12>(hw.analogIn[1]) + fp_t<int, 12>(5)) * fp_t<int, 12>(1.0 / 10.0);
+    scaledInput = scaledInput * scaledInput;
+    int targetFreq = int(fp_t<int, 12>(targetFreq * targetFreq) * fp_t<int, 0>(1000) + fp_t<int, 0>(50));
+    for(int i=0; i<NUM_WORDS; i++) {
+      int freq = invertFreq(freqs[wrapInterval(index + i)], targetFreq, targetFreq * 2);
+      oscs[i].SetFreq(freq);
+      hw.cvOut[i]->SetBipolar(oscs[i].Process() * fp_t<int, 0>(2) - fp_t<int, 0>(1));
+    }
+  }
+};
+
 #endif

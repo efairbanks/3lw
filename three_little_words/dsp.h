@@ -58,6 +58,9 @@ public:
     phase = 0;
     delta = 0;
   }
+  void SetFreq(int freq) {
+    delta = fp_t<uint32_t, 30>(1.0 / SAMPLE_RATE) * fp_t<uint32_t, 0>(freq);
+  }
   void SetPeriodInSamples(int samples, int multiplier) {
     delta = (phase_t(1.0) / fp_t<uint32_t, 0>(samples)) * fp_t<uint32_t, 0>(multiplier);
   }

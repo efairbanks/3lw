@@ -19,8 +19,10 @@ void audio_callback() {
 App* getAppByIndex(int index) {
   switch(index) {
     case 0:
-      return new MultiSeq();
+      return new ChordGen();
     case 1:
+      return new MultiSeq();
+    case 2:
       return new ThreeLittleWords();
     default:
       return getAppByIndex(index%2);
